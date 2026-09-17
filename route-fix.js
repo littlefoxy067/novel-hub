@@ -2,10 +2,17 @@
   const API = 'https://novel-api.nabaikabaiaguo.workers.dev';
   const app = document.getElementById('app');
   if (!app) return;
+
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
   const pick = (obj, keys, fallback = '') => { for (const key of keys) if (obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key]; return fallback; };
   const unwrap = value => { if (!value || typeof value !== 'object' || Array.isArray(value)) return value; for (const key of ['data','result','payload','response']) if (value[key] !== undefined) return unwrap(value[key]); return value; };
-  const arrayFrom = value => { if (Array.isArray(value)) return value; if (!value || typeof value !== 'object') return []; for (const key of ['items','list','records','chapters','rows']) if (Array.isArray(value[key])) return value[key]; return []; };
+  const arrayFrom = value => {
+    if (Array.isArray(value)) return value;
+    if (!value || typeof value !== 'object') return [];
+    for (const key of ['items','list','records','chapters','rows']) if (Array.isArray(value[key])) return value[key];
+    for (const key of Object.keys(value)) if (Array.isArray(value[key])) return value[key];
+    return [];
+  };
   const bookFrom = raw => ({
     id: String(pick(raw, ['id','novelId','novel_id','bookId','nid'], '')),
     title: String(pick(raw, ['title','name','novelName','bookName'], 'Untitled')),
@@ -13,28 +20,101 @@
     summary: String(pick(raw, ['summary','description','intro','story','desc'], 'No description available.')),
     cover: String(pick(raw, ['cover','coverUrl','cover_url','image','imageUrl','pic','thumb','poster'], '') || '')
   });
-  async function api(path) { const r = await fetch(API + path, { headers:{Accept:'application/json'}, cache:'no-store' }); if (!r.ok) throw Error('API '+r.status); return r.json(); }
+  const chapterFrom = (raw, index) => ({
+    id: String(pick(raw, ['id','chapterId','chapter_id','cid'], '')),
+    title: String(pick(raw, ['title','name','chapterName'], 'Chapter ' + (index + 1))),
+    index
+  });
+
+  async function api(path) {
+    const r = await fetch(API + path, { headers:{Accept:'application/json'}, cache:'no-store' });
+    if (!r.ok) throw Error('API ' + r.status);
+    return r.json();
+  }
+
+  async function getBook(id) {
+    const book = bookFrom(unwrap(await api('/novel/' + encodeURIComponent(id))));
+    book.id = book.id || id;
+    return book;
+  }
+
+  async function getChapters(id) {
+    return arrayFrom(unwrap(await api('/chapters?id=' + encodeURIComponent(id) + '&order=asc&p=1&l=100')))
+      .map(chapterFrom)
+      .filter(chapter => chapter.id);
+  }
+
+  function chapterHref(chapter, book, index) {
+    return '#/chapter/' + encodeURIComponent(chapter.id) + '/' + encodeURIComponent(book.id) + '/' + encodeURIComponent(book.title) + '/' + index;
+  }
+
+  async function recoverNovel(id) {
+    const book = await getBook(id);
+    const chapters = await getChapters(book.id);
+    const cover = book.cover ? `<img src="${esc(book.cover)}" alt="${esc(book.title)}">` : '<div class="poster-fallback">🦊</div>';
+    const links = chapters.map((chapter, i) => `<a class="chapter" href="${chapterHref(chapter, book, i)}"><span>${esc(chapter.title)}</span><span>→</span></a>`).join('');
+    const first = chapters[0];
+    app.innerHTML = `<div class="page detail"><a class="back" href="#/">← HOME</a><div class="detail-top"><div><div class="poster">${cover}</div></div><div><div class="eyebrow">NOVEL</div><h1>${esc(book.title)}</h1><p class="author">${esc(book.author)}</p><p class="summary">${esc(book.summary)}</p>${first ? `<a class="primary" href="${chapterHref(first, book, 0)}">START READING</a>` : ''}</div></div><div class="chapters"><div class="chapters-heading"><div><div class="eyebrow">READ</div><h2>Chapters</h2></div><span>${chapters.length ? chapters.length+' chapters' : 'No chapters'}</span></div>${links || '<div class="status">No chapters found.</div>'}</div></div>`;
+  }
+
+  async function recoverChapter(parts) {
+    const cid = decodeURIComponent(parts[2] || '').trim();
+    const bookId = decodeURIComponent(parts[3] || '').trim();
+    const title = decodeURIComponent(parts[4] || '').trim() || 'Novel';
+    if (!cid || !bookId) return;
+
+    const book = await getBook(bookId);
+    const chapters = await getChapters(book.id);
+    const requested = Number(parts[5]);
+    const currentIndex = Number.isInteger(requested) && requested >= 0 ? requested : chapters.findIndex(ch => ch.id === cid);
+    const index = currentIndex >= 0 ? currentIndex : 0;
+    const current = chapters.find(ch => ch.id === cid) || chapters[index];
+    const data = unwrap(await api('/chapter/' + encodeURIComponent(cid)));
+    const content = String(pick(data, ['content','text','body'], 'No chapter content available.'));
+    const chapterTitle = String(pick(data, ['title','name','chapterName'], current?.title || title || 'Chapter'));
+    const paragraphs = content.replace(/\r/g, '').split(/\n{2,}/).map(x => x.trim()).filter(Boolean);
+    const lines = paragraphs.length > 1 ? paragraphs : content.split(/\n+/).map(x => x.trim()).filter(Boolean);
+    const previous = index > 0 ? chapters[index - 1] : null;
+    const next = index < chapters.length - 1 ? chapters[index + 1] : null;
+
+    app.innerHTML = `<div class="reader-shell" id="recoveredReader"><div class="reader-progress"><div id="recoveredProgressFill"></div></div><header class="reader-topbar"><div class="reader-top-left"><a class="reader-back" href="#/novel/${encodeURIComponent(book.id)}">← <span>BACK</span></a><div class="reader-book"><small>${esc(book.title)}</small><b>${esc(chapterTitle)}</b></div></div><div class="reader-top-tools"><span id="recoveredProgressText" class="reader-progress-text">0%</span><a class="reader-back" href="#/novel/${encodeURIComponent(book.id)}">☰ <span>CHAPTERS</span></a></div></header><main class="reader-main"><div class="reader-kicker"><span>${esc(book.title)}</span><i>·</i><span>CHAPTER ${index + 1}</span></div><article class="reader-article" tabindex="-1"><h1>${esc(chapterTitle)}</h1>${lines.map(p => `<p>${esc(p)}</p>`).join('')}</article><nav class="chapter-nav" aria-label="Chapter navigation">${previous ? `<a class="chapter-nav-btn" href="${chapterHref(previous, book, index - 1)}"><span>←</span><small>PREVIOUS</small><b>${esc(previous.title)}</b></a>` : '<span class="chapter-nav-btn disabled"><span>—</span><small>PREVIOUS</small><b>Beginning</b></span>'}<a class="chapter-nav-center" href="#/novel/${encodeURIComponent(book.id)}"><span>CHAPTER</span><b>${index + 1} / ${chapters.length || '—'}</b><small>VIEW ALL</small></a>${next ? `<a class="chapter-nav-btn next" href="${chapterHref(next, book, index + 1)}"><small>NEXT</small><b>${esc(next.title)}</b><span>→</span></a>` : '<span class="chapter-nav-btn disabled next"><small>NEXT</small><b>End of story</b><span>—</span></span>'}</nav></main></div>`;
+
+    const updateProgress = () => {
+      const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const value = Math.min(1, Math.max(0, window.scrollY / max));
+      const fill = document.getElementById('recoveredProgressFill');
+      const text = document.getElementById('recoveredProgressText');
+      if (fill) fill.style.transform = `scaleX(${value})`;
+      if (text) text.textContent = Math.round(value * 100) + '%';
+    };
+    window.addEventListener('scroll', updateProgress, { passive:true });
+    setTimeout(updateProgress, 100);
+  }
+
   async function recover() {
     const route = location.hash.slice(1) || '/';
-    if (!route.startsWith('/novel/')) return;
-    const id = decodeURIComponent(route.slice(7)).trim();
-    if (!id || !/^\d+$/.test(id)) return;
-    for (let i=0; i<40; i++) { if (app.textContent.includes('Novel not found.')) break; await new Promise(r => setTimeout(r, 100)); }
-    if (!app.textContent.includes('Novel not found.')) return;
     try {
-      const book = bookFrom(unwrap(await api('/novel/' + encodeURIComponent(id))));
-      book.id = book.id || id;
-      const chapters = arrayFrom(unwrap(await api('/chapters?id=' + encodeURIComponent(book.id) + '&order=asc&p=1&l=100')));
-      const cover = book.cover ? `<img src="${esc(book.cover)}" alt="${esc(book.title)}">` : '<div class="poster-fallback">🦊</div>';
-      const links = chapters.map((chapter, i) => {
-        const cid = String(pick(chapter, ['id','chapterId','chapter_id','cid'], ''));
-        const title = String(pick(chapter, ['title','name','chapterName'], 'Chapter '+(i+1)));
-        return cid ? `<a class="chapter" href="#/chapter/${encodeURIComponent(cid)}/${encodeURIComponent(book.id)}/${encodeURIComponent(book.title)}/${i}"><span>${esc(title)}</span><span>→</span></a>` : '';
-      }).join('');
-      const first = chapters[0] ? String(pick(chapters[0], ['id','chapterId','chapter_id','cid'], '')) : '';
-      app.innerHTML = `<div class="page detail"><a class="back" href="#/">← HOME</a><div class="detail-top"><div><div class="poster">${cover}</div></div><div><div class="eyebrow">NOVEL</div><h1>${esc(book.title)}</h1><p class="author">${esc(book.author)}</p><p class="summary">${esc(book.summary)}</p>${first ? `<a class="primary" href="#/chapter/${encodeURIComponent(first)}/${encodeURIComponent(book.id)}/${encodeURIComponent(book.title)}/0">START READING</a>` : ''}</div></div><div class="chapters"><div class="chapters-heading"><div><div class="eyebrow">READ</div><h2>Chapters</h2></div><span>${chapters.length ? chapters.length+' chapters' : 'No chapters'}</span></div>${links || '<div class="status">No chapters found.</div>'}</div></div>`;
-    } catch (_) {}
+      if (route.startsWith('/novel/')) {
+        const id = decodeURIComponent(route.slice(7)).trim();
+        if (!id || !/^\d+$/.test(id)) return;
+        for (let i = 0; i < 40; i++) {
+          if (app.textContent.includes('Novel not found.')) break;
+          await new Promise(r => setTimeout(r, 100));
+        }
+        if (app.textContent.includes('Novel not found.')) await recoverNovel(id);
+      } else if (route.startsWith('/chapter/')) {
+        const parts = route.split('/');
+        for (let i = 0; i < 40; i++) {
+          if (app.querySelector('.reader-shell') || app.textContent.includes('Open this chapter from a novel page')) break;
+          await new Promise(r => setTimeout(r, 100));
+        }
+        if (!app.querySelector('.reader-shell') || app.textContent.includes('Open this chapter from a novel page')) await recoverChapter(parts);
+      }
+    } catch (_) {
+      // Leave the normal app error page visible if recovery fails.
+    }
   }
+
   window.addEventListener('DOMContentLoaded', recover);
   window.addEventListener('hashchange', recover);
 })();
