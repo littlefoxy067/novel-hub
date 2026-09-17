@@ -1,0 +1,18 @@
+{
+  "name": "Novel Hub",
+  "short_name": "Novel Hub",
+  "description": "Discover, read and save your next story.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07080d",
+  "theme_color": "#07080d",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
