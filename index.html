@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f4efe6" />
+  <meta name="description" content="Novel Hub — discover your next story." />
+  <title>Novel Hub — Find your next story</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="#home" aria-label="Novel Hub home">
+      <span class="brand-mark">NH</span>
+      <span>Novel Hub</span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a class="nav-link is-active" href="#home">Home</a>
+      <a class="nav-link" href="#discover">Discover</a>
+      <a class="nav-link" href="#rankings">Rankings</a>
+      <a class="nav-link" href="#shelf">My Shelf</a>
+    </nav>
+    <button id="themeToggle" class="icon-button" type="button" aria-label="Switch theme">☼</button>
+  </header>
+
+  <main id="app">
+    <section id="home" class="hero-section" aria-label="Featured novels">
+      <div class="hero-copy">
+        <p class="eyebrow">A quieter place for big stories</p>
+        <h1>Find a story<br /><em>worth staying for.</em></h1>
+        <p class="hero-intro">Browse novels, follow chapters, and keep your next read close.</p>
+        <form id="heroSearch" class="search-bar" role="search">
+          <span aria-hidden="true">⌕</span>
+          <input id="heroSearchInput" type="search" autocomplete="off" placeholder="Search a title, author, or idea…" />
+          <button type="submit">Search</button>
+        </form>
+      </div>
+
+      <div class="hero-stage">
+        <div class="hero-orbit orbit-one"></div>
+        <div class="hero-orbit orbit-two"></div>
+        <div id="heroCarousel" class="hero-carousel" aria-live="polite"></div>
+        <div class="carousel-controls">
+          <button id="heroPrev" class="round-button" type="button" aria-label="Previous featured novel">←</button>
+          <div id="heroDots" class="dots" aria-label="Featured novel positions"></div>
+          <button id="heroNext" class="round-button" type="button" aria-label="Next featured novel">→</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="discover" class="section-block">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">The shelf</p>
+          <h2>Stories to wander into</h2>
+        </div>
+        <a href="#search" class="text-link">See all →</a>
+      </div>
+      <div id="featuredGrid" class="book-grid"></div>
+    </section>
+
+    <section class="section-block split-section">
+      <div class="panel panel-paper" id="rankings">
+        <div class="section-heading compact">
+          <div>
+            <p class="eyebrow">Popular now</p>
+            <h2>Readers are opening</h2>
+          </div>
+        </div>
+        <div id="rankingList" class="ranking-list"></div>
+      </div>
+      <aside class="panel panel-ink">
+        <p class="eyebrow light">Little Foxy note</p>
+        <h2>Take your time.</h2>
+        <p>Novel Hub is built around discovery, not noise — one cover, one idea, one chapter at a time.</p>
+        <a class="outline-button light-button" href="#search">Explore the catalogue</a>
+      </aside>
+    </section>
+
+    <section class="section-block genres-block">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">By mood</p>
+          <h2>Pick a doorway</h2>
+        </div>
+      </div>
+      <div id="genreChips" class="genre-chips"></div>
+    </section>
+
+    <section id="search" class="section-block search-section">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Library search</p>
+          <h2>Look for something specific</h2>
+        </div>
+        <span id="resultCount" class="result-count"></span>
+      </div>
+      <form id="searchForm" class="wide-search">
+        <span aria-hidden="true">⌕</span>
+        <input id="searchInput" type="search" autocomplete="off" placeholder="Try: fantasy, mystery, adventure…" />
+        <button type="submit">Find stories</button>
+      </form>
+      <div id="searchState" class="search-state" hidden></div>
+      <div id="searchResults" class="book-grid search-grid"></div>
+    </section>
+
+    <section id="shelf" class="section-block shelf-section">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Your corner</p>
+          <h2>My Shelf</h2>
+        </div>
+        <button id="clearShelf" class="text-button" type="button">Clear shelf</button>
+      </div>
+      <div id="shelfGrid" class="book-grid"></div>
+    </section>
+  </main>
+
+  <div id="detailView" class="detail-view" hidden>
+    <button id="detailClose" class="detail-close" type="button" aria-label="Close novel details">×</button>
+    <div id="detailContent" class="detail-inner"></div>
+  </div>
+
+  <div id="readerView" class="reader-view" hidden>
+    <div class="reader-topbar">
+      <button id="readerBack" class="text-button" type="button">← Back</button>
+      <span id="readerTitle"></span>
+      <button id="readerClose" class="text-button" type="button">Close</button>
+    </div>
+    <article id="readerContent" class="reader-content"></article>
+    <div id="readerNav" class="reader-nav"></div>
+  </div>
+
+  <footer class="site-footer">
+    <span>Novel Hub</span>
+    <span>Built with curiosity · 🦊</span>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
