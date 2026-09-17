@@ -1,1 +1,413 @@
-const API='https://novel-api.nabaikabaiaguo.workers.dev';const KEY='novelhub-shelf-v2';const $=s=>document.querySelector(s),app=$('#app');const state={home:[],shelf:[],cache:new Map(),hero:0,timer:null};const unsafe=/\b(18\+|adult|explicit|erotica|hentai|porn|smut|nsfw)\b/i;const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const val=(x,ks,d='')=>{for(const k of ks)if(x?.[k]!==undefined&&x[k]!==null&&x[k]!=='')return x[k];return d};const unwrap=x=>{if(!x||typeof x!=='object'||Array.isArray(x))return x;for(const k of ['data','result','results','items','list','payload'])if(x[k]!==undefined)return unwrap(x[k]);return x};function book(x={}){let g=val(x,['genre','category','genres','type'],'Novel');if(Array.isArray(g))g=g[0]||'Novel';let tags=val(x,['tags','keywords','keyword'],[]);if(!Array.isArray(tags))tags=String(tags).split(/[,，|]/).map(s=>s.trim()).filter(Boolean);let c=val(x,['cover','coverUrl','cover_url','image','imageUrl','pic','thumb','poster'],'');c=typeof c==='object'?val(c,['url','src'],''):c;return{id:String(val(x,['id','novelId','novel_id','bookId','nid'],'')),detailPath:String(val(x,['detailPath','detail_path','path','url','detailUrl'],'')),title:String(val(x,['title','name','novelName','bookName'],'Untitled')),author:String(val(x,['author','writer','authorName','novelAuthor'],'Unknown author')),summary:String(val(x,['summary','description','intro','story','desc'],'No description available.')),cover:String(c||''),genre:String(g),tags,score:val(x,['score','rating','rate'],''),chapters:val(x,['chapters','chapterCount','chapter_count'],'')}}function list(x){let a=unwrap(x);a=Array.isArray(a)?a:Array.isArray(a?.data)?a.data:a?[a]:[];return a.map(book).filter(b=>!unsafe.test([b.title,b.author,b.summary,b.genre,...b.tags].join(' ')))}async function api(p){const r=await fetch(p.startsWith('http')?p:API+p,{headers:{Accept:'application/json'}});if(!r.ok)throw Error(r.status);return r.json()}function id(b){return b.id||b.detailPath||b.title}function isSaved(b){return state.shelf.some(x=>id(x)===id(b))}function toggle(b){const yes=isSaved(b);state.shelf=yes?state.shelf.filter(x=>id(x)!==id(b)):[b,...state.shelf];localStorage.setItem(KEY,JSON.stringify(state.shelf));toast(yes?'Removed from My Shelf':'Added to My Shelf')}function remember(a){a.forEach(b=>state.cache.set(id(b),b))}function poster(b,rank=''){return `<div class="poster">${b.cover?`<img src="${esc(b.cover)}" alt="${esc(b.title)}" loading="lazy" onerror="this.remove()">`:''}${rank?`<b class="rank">${rank}</b>`:''}</div>`}function card(b,rank=''){remember([b]);return `<article class="card"><a href="#/novel/${encodeURIComponent(id(b))}">${poster(b,rank)}</a><h3>${esc(b.title)}</h3><small>${esc(b.author)}</small><button class="shelf-btn ${isSaved(b)?'saved':''}" data-save="${esc(id(b))}">${isSaved(b)?'✓ On shelf':'+ My Shelf'}</button></article>`}function wire(){document.querySelectorAll('[data-save]').forEach(x=>x.onclick=e=>{e.preventDefault();const b=state.cache.get(x.dataset.save);if(b){toggle(b);render()}})}function section(label,title,a,rank=false){return `<section class="section"><div class="head"><div><div class="eyebrow">${label}</div><h2>${title}</h2></div></div><div class="row">${a.length?a.map((b,i)=>card(b,rank?String(i+1).padStart(2,'0'):'')).join(''):'<div class="empty">No stories available.</div>'}</div></section>`}function home(){clearInterval(state.timer);const a=state.home,b=a.length?a[state.hero%Math.min(6,a.length)]:null;app.innerHTML=`<div class="page"><section class="hero"><div class="copy"><div class="eyebrow">NOVELHUB · FOXY EDITION</div><h1>YOUR NEXT<br><i>STORY</i> IS HERE.</h1><p>Discover novels, jump into chapters and build your own reading shelf.</p><form id="heroSearch" class="hero-search"><input id="heroInput" placeholder="Search novels, authors, worlds..."><button>SEARCH</button></form></div><div class="feature">${b?`<div><a class="hero-card" href="#/novel/${encodeURIComponent(id(b))}">${b.cover?`<img src="${esc(b.cover)}" alt="${esc(b.title)}">`:''}<div class="hero-info"><div class="eyebrow">FEATURED NOW</div><h2>${esc(b.title)}</h2><p>${esc(b.summary)}</p></div></a><div class="dots">${a.slice(0,6).map((_,i)=>`<button class="dot ${i===state.hero?'active':''}" data-hero="${i}"></button>`).join('')}</div></div>`:'<div class="hero-card"></div>'}</div></section>${section('TRENDING','Trending stories',a.slice(0,12),true)}${section('DISCOVER','Fresh from the catalogue',a.slice(3,12))}<section class="section"><div class="head"><div><div class="eyebrow">FIND YOUR MOOD</div><h2>Browse genres</h2></div></div><div class="genre-list">${[...new Set(a.flatMap(b=>[b.genre,...b.tags]).filter(Boolean))].slice(0,10).map(g=>`<a class="genre" href="#/search/${encodeURIComponent(g)}">${esc(g)}</a>`).join('')}</div></section></div>`;wire();$('#heroSearch').onsubmit=e=>{e.preventDefault();go($('#heroInput').value)};document.querySelectorAll('[data-hero]').forEach(x=>x.onclick=()=>{state.hero=+x.dataset.hero;home()});if(a.length>1)state.timer=setInterval(()=>{state.hero=(state.hero+1)%Math.min(6,a.length);home()},6500)}async function loadHome(){try{state.home=list(await api('/featured?p=1&l=12'))}catch{state.home=[]}remember(state.home);home()}function go(q){q=String(q||'').trim();if(q)location.hash='#/search/'+encodeURIComponent(q)}async function search(q){const term=decodeURIComponent(q);app.innerHTML=`<div class="page search-page"><div class="head"><div><div class="eyebrow">SEARCH</div><h2>Results for “${esc(term)}”</h2></div></div><form id="searchForm" class="big-search"><input id="searchInput" value="${esc(term)}"><button>SEARCH</button></form><div id="status" class="status">Searching the catalogue...</div><div id="results" class="grid"></div></div>`;$('#searchForm').onsubmit=e=>{e.preventDefault();go($('#searchInput').value)};try{const a=list(await api('/search?q='+encodeURIComponent(term)+'&p=1&l=30'));remember(a);$('#status').textContent=a.length?`${a.length} stories found`:'No matching stories found.';$('#results').innerHTML=a.length?a.map(card).join(''):'<div class="empty">Try another title, author or genre.</div>';wire()}catch{$('#status').textContent='The catalogue could not be reached right now.'}}async function genres(){const g=[...new Set(state.home.flatMap(b=>[b.genre,...b.tags]).filter(Boolean))];app.innerHTML=`<div class="page search-page"><div class="head"><div><div class="eyebrow">DISCOVER</div><h2>Choose a genre</h2></div></div><div class="genre-list">${(g.length?g:['Fantasy','Adventure','Mystery','Drama','Romance','Science Fiction','History','Comedy']).map(x=>`<a class="genre" href="#/search/${encodeURIComponent(x)}">${esc(x)}</a>`).join('')}</div></div>`}function shelf(){remember(state.shelf);app.innerHTML=`<div class="page search-page"><div class="head"><div><div class="eyebrow">YOUR LIBRARY</div><h2>My Shelf</h2></div></div><div class="grid">${state.shelf.length?state.shelf.map(card).join(''):'<div class="empty">Your shelf is empty.<br>Add novels from the catalogue.</div>'}</div></div>`;wire()}async function novel(k){const b=state.cache.get(decodeURIComponent(k))||state.home.find(x=>id(x)===decodeURIComponent(k))||state.shelf.find(x=>id(x)===decodeURIComponent(k));if(!b){app.innerHTML='<div class="page detail"><div class="empty">Novel not found.</div></div>';return}let d=b;try{let p=b.detailPath;if(p&&p.startsWith(API))p=p.slice(API.length);if(!p)p='/novel/'+encodeURIComponent(b.id);d={...b,...book(unwrap(await api(p)))}}catch{}remember([d]);app.innerHTML=`<div class="page detail"><button class="back" onclick="history.back()">← BACK</button><div class="detail-top">${poster(d)}<div><div class="eyebrow">NOVEL</div><h1>${esc(d.title)}</h1><p class="author">${esc(d.author)}</p><p class="summary">${esc(d.summary)}</p><button class="primary" id="save">${isSaved(d)?'✓ SAVED':'+ ADD TO SHELF'}</button></div></div><div class="chapters"><div class="eyebrow">READ</div><h2>Chapters</h2><div id="chapterList" class="status">Loading chapters...</div></div></div>`;$('#save').onclick=()=>{toggle(d);$('#save').textContent=isSaved(d)?'✓ SAVED':'+ ADD TO SHELF'};try{const raw=unwrap(await api('/chapters?id='+encodeURIComponent(d.id)+'&order=asc&p=1&l=100'));const a=Array.isArray(raw)?raw:(raw?.data||raw?.chapters||raw?.items||[]);$('#chapterList').innerHTML=a.map((c,i)=>`<button class="chapter" data-ch="${esc(val(c,['id','chapterId','chapter_id'],''))}"><span>${esc(val(c,['title','name','chapterName'],'Chapter '+(i+1)))}</span><span>→</span></button>`).join('')||'No chapters found.';document.querySelectorAll('[data-ch]').forEach(x=>x.onclick=()=>read(x.dataset.ch,d.title))}catch{$('#chapterList').textContent='Chapters could not be loaded.'}}async function read(cid,title){app.innerHTML=`<div class="reader"><div class="reader-bar"><a href="javascript:history.back()">← BACK</a><span>${esc(title)}</span></div><article id="article"><div class="status">Opening chapter...</div></article></div>`;try{const x=unwrap(await api('/chapter/'+encodeURIComponent(cid)));const content=String(val(x,['content','text','html','body'],'No chapter content available.'));$('#article').innerHTML='<h1>'+esc(val(x,['title','name'],'Chapter'))+'</h1>'+(content.includes('<')?content:content.split(/\n+/).map(p=>'<p>'+esc(p)+'</p>').join(''))}catch{$('#article').innerHTML='<p>The chapter could not be loaded.</p>'}}function toast(t){const x=$('#toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),1800)}function render(){const r=location.hash.slice(1)||'/';if(r.startsWith('/search/'))return search(r.slice(8));if(r.startsWith('/novel/'))return novel(r.slice(7));if(r==='/genres')return genres();if(r==='/shelf')return shelf();loadHome()}try{state.shelf=JSON.parse(localStorage.getItem(KEY)||'[]')}catch{}$('#navSearch').onsubmit=e=>{e.preventDefault();go($('#navSearchInput').value)};window.addEventListener('hashchange',render);window.addEventListener('DOMContentLoaded',render);
+const API = 'https://novel-api.nabaikabaiaguo.workers.dev';
+const SHELF_KEY = 'novelhub-shelf-v3';
+const $ = (s, root = document) => root.querySelector(s);
+const app = $('#app');
+
+const state = {
+  home: [],
+  shelf: [],
+  cache: new Map(),
+  hero: 0,
+  timer: null,
+  loadingHome: false
+};
+
+const unsafe = /\b(18\+|adult|explicit|erotica|hentai|porn|smut|nsfw)\b/i;
+
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, ch => ({
+  '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+}[ch]));
+
+function pick(obj, keys, fallback = '') {
+  for (const key of keys) {
+    if (obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
+  }
+  return fallback;
+}
+
+function unwrap(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  for (const key of ['data','result','payload','response']) {
+    if (value[key] !== undefined) return unwrap(value[key]);
+  }
+  return value;
+}
+
+function arrayFrom(value) {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== 'object') return [];
+  for (const key of ['items','list','records','novels','books','subjects','content','rows']) {
+    if (Array.isArray(value[key])) return value[key];
+  }
+  for (const key of Object.keys(value)) {
+    if (Array.isArray(value[key])) return value[key];
+  }
+  return [];
+}
+
+function normalizeBook(raw = {}) {
+  let genre = pick(raw, ['genre','category','genres','type'], 'Novel');
+  if (Array.isArray(genre)) genre = genre[0] || 'Novel';
+
+  let tags = pick(raw, ['tags','keywords','keyword'], []);
+  if (!Array.isArray(tags)) tags = String(tags).split(/[,，|]/).map(x => x.trim()).filter(Boolean);
+
+  let cover = pick(raw, ['cover','coverUrl','cover_url','image','imageUrl','pic','thumb','poster'], '');
+  if (cover && typeof cover === 'object') cover = pick(cover, ['url','src','href'], '');
+
+  return {
+    id: String(pick(raw, ['id','novelId','novel_id','bookId','nid'], '')),
+    detailPath: String(pick(raw, ['detailPath','detail_path','path','detailUrl'], '')),
+    title: String(pick(raw, ['title','name','novelName','bookName'], 'Untitled')),
+    author: String(pick(raw, ['author','writer','authorName','novelAuthor'], 'Unknown author')),
+    summary: String(pick(raw, ['summary','description','intro','story','desc'], 'No description available.')),
+    cover: String(cover || ''),
+    genre: String(genre || 'Novel'),
+    tags,
+    score: pick(raw, ['score','rating','rate','rank'], ''),
+    chapters: pick(raw, ['chapters','chapterCount','chapter_count'], '')
+  };
+}
+
+function normalizeList(payload) {
+  const raw = unwrap(payload);
+  return arrayFrom(raw)
+    .map(normalizeBook)
+    .filter(book => !unsafe.test([book.title, book.author, book.summary, book.genre, ...book.tags].join(' ')));
+}
+
+async function api(path) {
+  const url = path.startsWith('http') ? path : API + path;
+  const response = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store'
+  });
+  if (!response.ok) throw new Error(`API ${response.status}`);
+  return response.json();
+}
+
+function bookKey(book) {
+  return book.id || book.detailPath || book.title;
+}
+
+function remember(books) {
+  books.forEach(book => state.cache.set(bookKey(book), book));
+}
+
+function isSaved(book) {
+  const key = bookKey(book);
+  return state.shelf.some(item => bookKey(item) === key);
+}
+
+function toggleShelf(book) {
+  const key = bookKey(book);
+  if (isSaved(book)) {
+    state.shelf = state.shelf.filter(item => bookKey(item) !== key);
+    toast('Removed from My Shelf');
+  } else {
+    state.shelf = [book, ...state.shelf];
+    toast('Added to My Shelf');
+  }
+  localStorage.setItem(SHELF_KEY, JSON.stringify(state.shelf));
+}
+
+function poster(book, rank = '') {
+  const image = book.cover
+    ? `<img src="${esc(book.cover)}" alt="${esc(book.title)}" loading="lazy" onerror="this.style.display='none'">`
+    : '<div class="poster-fallback">🦊</div>';
+  return `<div class="poster">${image}${rank ? `<b class="rank">${esc(rank)}</b>` : ''}</div>`;
+}
+
+function card(book, rank = '') {
+  remember([book]);
+  const key = bookKey(book);
+  return `<article class="card">
+    <a class="poster-link" href="#/novel/${encodeURIComponent(key)}">${poster(book, rank)}</a>
+    <h3 title="${esc(book.title)}">${esc(book.title)}</h3>
+    <small>${esc(book.author)}</small>
+    <button type="button" class="shelf-btn ${isSaved(book) ? 'saved' : ''}" data-save="${esc(key)}">
+      ${isSaved(book) ? '✓ On shelf' : '+ My Shelf'}
+    </button>
+  </article>`;
+}
+
+function section(label, title, books, ranked = false) {
+  return `<section class="section">
+    <div class="head"><div><div class="eyebrow">${esc(label)}</div><h2>${esc(title)}</h2></div></div>
+    <div class="row">${books.length ? books.map((book, i) => card(book, ranked ? String(i + 1).padStart(2, '0') : '')).join('') : '<div class="empty">No stories available yet.</div>'}</div>
+  </section>`;
+}
+
+function bindCommon() {
+  document.querySelectorAll('[data-save]').forEach(button => {
+    button.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const book = state.cache.get(button.dataset.save);
+      if (!book) return;
+      toggleShelf(book);
+      render();
+    });
+  });
+}
+
+function hero(book, total) {
+  if (!book) return '<section class="hero empty-hero"><div><div class="eyebrow">NOVELHUB · FOXY EDITION</div><h1>DISCOVER YOUR NEXT <i>STORY.</i></h1><p>The catalogue is loading. Try search from the bar above.</p></div></section>';
+
+  const max = Math.min(6, total.length);
+  return `<section class="hero">
+    <div class="hero-bg">${book.cover ? `<img src="${esc(book.cover)}" alt="">` : ''}</div>
+    <div class="hero-shade"></div>
+    <div class="hero-grid"></div>
+    <div class="hero-content">
+      <div class="hero-copy">
+        <div class="eyebrow">FEATURED · ${esc(book.genre || 'NOVEL')}</div>
+        <h1>${esc(book.title)}</h1>
+        <div class="hero-meta"><span>${esc(book.author)}</span>${book.score ? `<span>★ ${esc(book.score)}</span>` : ''}<span>NOVEL</span></div>
+        <p>${esc(book.summary)}</p>
+        <div class="hero-actions">
+          <a class="primary" href="#/novel/${encodeURIComponent(bookKey(book))}">READ NOW</a>
+          <a class="secondary" href="#/novel/${encodeURIComponent(bookKey(book))}">DETAILS</a>
+        </div>
+      </div>
+      <div class="hero-poster">${poster(book)}</div>
+    </div>
+    <div class="hero-controls">
+      <button type="button" data-hero-prev aria-label="Previous featured novel">‹</button>
+      <div class="hero-dots">${total.slice(0, max).map((_, i) => `<button type="button" class="hero-dot ${i === state.hero ? 'active' : ''}" data-hero="${i}" aria-label="Featured ${i + 1}"></button>`).join('')}</div>
+      <button type="button" data-hero-next aria-label="Next featured novel">›</button>
+    </div>
+  </section>`;
+}
+
+function renderHome() {
+  clearInterval(state.timer);
+  const books = state.home;
+  const current = books.length ? books[state.hero % Math.min(6, books.length)] : null;
+  const genres = [...new Set(books.flatMap(book => [book.genre, ...book.tags]).filter(Boolean))].slice(0, 12);
+
+  app.innerHTML = `<div class="home-page">
+    ${hero(current, books)}
+    ${section('HOT', 'Popular stories', books.slice(0, 12), true)}
+    ${section('DISCOVER', 'Fresh from the catalogue', books.slice(4, 16))}
+    <section class="section"><div class="head"><div><div class="eyebrow">BROWSE</div><h2>Explore genres</h2></div><a href="#/genres">VIEW ALL →</a></div>
+      <div class="genre-list">${genres.map(g => `<a class="genre" href="#/search/${encodeURIComponent(g)}">${esc(g)}</a>`).join('') || '<span class="status">Genres will appear when catalogue data loads.</span>'}</div>
+    </section>
+  </div>`;
+
+  bindCommon();
+
+  const heroSearch = $('#heroSearch');
+  if (heroSearch) heroSearch.addEventListener('submit', event => {
+    event.preventDefault();
+    go($('#heroInput')?.value || '');
+  });
+
+  document.querySelectorAll('[data-hero]').forEach(button => {
+    button.addEventListener('click', () => {
+      state.hero = Number(button.dataset.hero) || 0;
+      renderHome();
+    });
+  });
+  $('[data-hero-prev]')?.addEventListener('click', () => {
+    const count = Math.min(6, books.length);
+    if (!count) return;
+    state.hero = (state.hero - 1 + count) % count;
+    renderHome();
+  });
+  $('[data-hero-next]')?.addEventListener('click', () => {
+    const count = Math.min(6, books.length);
+    if (!count) return;
+    state.hero = (state.hero + 1) % count;
+    renderHome();
+  });
+
+  if (books.length > 1) {
+    state.timer = setInterval(() => {
+      state.hero = (state.hero + 1) % Math.min(6, books.length);
+      renderHome();
+    }, 6000);
+  }
+}
+
+async function loadHome() {
+  if (state.loadingHome) return;
+  state.loadingHome = true;
+  app.innerHTML = `<div class="loading-page"><div class="loader"></div><p>LOADING NOVEL HUB...</p></div>`;
+
+  const requests = [
+    ['/featured?p=1&l=18', 0],
+    ['/rankings?rank=1&p=1&l=18', 1],
+    ['/search?q=popular&p=1&l=18', 2]
+  ];
+
+  const results = await Promise.allSettled(requests.map(([path]) => api(path)));
+  const merged = [];
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue;
+    merged.push(...normalizeList(result.value));
+  }
+
+  const unique = [];
+  const seen = new Set();
+  for (const book of merged) {
+    const key = bookKey(book);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(book);
+  }
+
+  state.home = unique;
+  state.hero = 0;
+  remember(state.home);
+  state.loadingHome = false;
+  renderHome();
+}
+
+function go(query) {
+  const value = String(query || '').trim();
+  if (!value) return;
+  location.hash = '#/search/' + encodeURIComponent(value);
+}
+
+async function searchPage(encoded) {
+  const term = decodeURIComponent(encoded || '').trim();
+  app.innerHTML = `<div class="page search-page">
+    <div class="head"><div><div class="eyebrow">SEARCH</div><h2>Results for “${esc(term)}”</h2></div></div>
+    <form id="searchForm" class="big-search"><input id="searchInput" value="${esc(term)}" placeholder="Search novels, authors or genres..."><button type="submit">SEARCH</button></form>
+    <div id="status" class="status">SEARCHING THE CATALOGUE...</div>
+    <div id="results" class="grid"></div>
+  </div>`;
+
+  $('#searchForm').addEventListener('submit', event => {
+    event.preventDefault();
+    go($('#searchInput').value);
+  });
+
+  try {
+    const payload = await api('/search?q=' + encodeURIComponent(term) + '&p=1&l=30');
+    const books = normalizeList(payload);
+    remember(books);
+    $('#status').textContent = books.length ? `${books.length} stories found` : 'No matching stories found.';
+    $('#results').innerHTML = books.length ? books.map(card).join('') : '<div class="empty">Try another title, author or genre.</div>';
+    bindCommon();
+  } catch (error) {
+    $('#status').textContent = 'The catalogue could not be reached right now.';
+    $('#results').innerHTML = '<div class="empty">Search is temporarily unavailable. Please try again.</div>';
+  }
+}
+
+function genresPage() {
+  const genres = [...new Set(state.home.flatMap(book => [book.genre, ...book.tags]).filter(Boolean))];
+  app.innerHTML = `<div class="page search-page"><div class="head"><div><div class="eyebrow">DISCOVER</div><h2>Choose a genre</h2></div></div><div class="genre-list">${(genres.length ? genres : ['Fantasy','Adventure','Mystery','Drama','Romance','Science Fiction','History','Comedy']).map(g => `<a class="genre" href="#/search/${encodeURIComponent(g)}">${esc(g)}</a>`).join('')}</div></div>`;
+}
+
+function shelfPage() {
+  remember(state.shelf);
+  app.innerHTML = `<div class="page search-page"><div class="head"><div><div class="eyebrow">YOUR LIBRARY</div><h2>My Shelf</h2></div></div><div class="grid">${state.shelf.length ? state.shelf.map(card).join('') : '<div class="empty">Your shelf is empty.<br>Add novels from the catalogue.</div>'}</div></div>`;
+  bindCommon();
+}
+
+async function novelPage(encoded) {
+  const key = decodeURIComponent(encoded || '');
+  const existing = state.cache.get(key) || state.home.find(book => bookKey(book) === key) || state.shelf.find(book => bookKey(book) === key);
+  if (!existing) {
+    app.innerHTML = '<div class="page detail"><div class="empty">Novel not found.</div></div>';
+    return;
+  }
+
+  let book = existing;
+  try {
+    let path = book.detailPath;
+    if (path && path.startsWith(API)) path = path.slice(API.length);
+    if (!path) path = '/novel/' + encodeURIComponent(book.id);
+    book = { ...book, ...normalizeBook(unwrap(await api(path))) };
+  } catch (_) {}
+  remember([book]);
+
+  app.innerHTML = `<div class="page detail">
+    <a class="back" href="#/">← HOME</a>
+    <div class="detail-top"><div>${poster(book)}</div><div><div class="eyebrow">NOVEL</div><h1>${esc(book.title)}</h1><p class="author">${esc(book.author)}</p><p class="summary">${esc(book.summary)}</p><button type="button" class="primary" id="saveBook">${isSaved(book) ? '✓ SAVED' : '+ ADD TO SHELF'}</button></div></div>
+    <div class="chapters"><div class="eyebrow">READ</div><h2>Chapters</h2><div id="chapterList" class="status">LOADING CHAPTERS...</div></div>
+  </div>`;
+
+  $('#saveBook').addEventListener('click', () => {
+    toggleShelf(book);
+    $('#saveBook').textContent = isSaved(book) ? '✓ SAVED' : '+ ADD TO SHELF';
+  });
+
+  try {
+    const payload = await api('/chapters?id=' + encodeURIComponent(book.id) + '&order=asc&p=1&l=100');
+    const chapters = arrayFrom(unwrap(payload));
+    $('#chapterList').innerHTML = chapters.length
+      ? chapters.map((chapter, i) => {
+          const cid = pick(chapter, ['id','chapterId','chapter_id'], '');
+          const title = pick(chapter, ['title','name','chapterName'], 'Chapter ' + (i + 1));
+          return `<a class="chapter" href="#/chapter/${encodeURIComponent(cid)}/${encodeURIComponent(book.title)}"><span>${esc(title)}</span><span>→</span></a>`;
+        }).join('')
+      : 'No chapters found.';
+  } catch (_) {
+    $('#chapterList').textContent = 'Chapters could not be loaded.';
+  }
+}
+
+async function readerPage(encodedId, encodedTitle) {
+  const cid = decodeURIComponent(encodedId || '');
+  const title = decodeURIComponent(encodedTitle || 'Novel');
+  app.innerHTML = `<div class="reader"><div class="reader-bar"><a href="javascript:history.back()">← BACK</a><span>${esc(title)}</span></div><article id="article"><div class="status">OPENING CHAPTER...</div></article></div>`;
+
+  try {
+    const payload = await api('/chapter/' + encodeURIComponent(cid));
+    const data = unwrap(payload);
+    const content = String(pick(data, ['content','text','body'], 'No chapter content available.'));
+    const chapterTitle = String(pick(data, ['title','name'], 'Chapter'));
+    $('#article').innerHTML = '<h1>' + esc(chapterTitle) + '</h1>' + content.split(/\n+/).filter(Boolean).map(p => '<p>' + esc(p) + '</p>').join('');
+  } catch (_) {
+    $('#article').innerHTML = '<div class="empty">The chapter could not be loaded.</div>';
+  }
+}
+
+function toast(message) {
+  const element = $('#toast');
+  if (!element) return;
+  element.textContent = message;
+  element.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => element.classList.remove('show'), 1800);
+}
+
+function render() {
+  const route = location.hash.slice(1) || '/';
+  clearInterval(state.timer);
+  if (route.startsWith('/search/')) return searchPage(route.slice(8));
+  if (route.startsWith('/novel/')) return novelPage(route.slice(7));
+  if (route.startsWith('/chapter/')) {
+    const parts = route.split('/');
+    return readerPage(parts[2], parts.slice(3).join('/'));
+  }
+  if (route === '/genres') return genresPage();
+  if (route === '/shelf') return shelfPage();
+  loadHome();
+}
+
+function setupNavigation() {
+  $('#navSearch')?.addEventListener('submit', event => {
+    event.preventDefault();
+    go($('#navSearchInput')?.value || '');
+  });
+
+  $('#menuBtn')?.addEventListener('click', () => {
+    document.body.classList.toggle('menu-open');
+  });
+}
+
+try {
+  state.shelf = JSON.parse(localStorage.getItem(SHELF_KEY) || '[]');
+  if (!Array.isArray(state.shelf)) state.shelf = [];
+} catch (_) {
+  state.shelf = [];
+}
+
+setupNavigation();
+window.addEventListener('hashchange', render);
+window.addEventListener('DOMContentLoaded', render);
