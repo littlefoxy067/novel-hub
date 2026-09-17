@@ -48,31 +48,58 @@
     return '#/chapter/' + encodeURIComponent(chapter.id) + '/' + encodeURIComponent(book.id) + '/' + encodeURIComponent(book.title) + '/' + index;
   }
 
+  function shortSummary(text, limit = 180) {
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
+    if (clean.length <= limit) return clean;
+    const cut = clean.slice(0, limit);
+    const last = cut.lastIndexOf(' ');
+    return (last > 100 ? cut.slice(0, last) : cut).trim();
+  }
+
   async function recoverNovel(id) {
     const book = await getBook(id);
     const chapters = await getChapters(book.id);
     const cover = book.cover ? `<img src="${esc(book.cover)}" alt="${esc(book.title)}">` : '<div class="poster-fallback">🦊</div>';
     const links = chapters.map((chapter, i) => `<a class="chapter" href="${chapterHref(chapter, book, i)}"><span>${esc(chapter.title)}</span><span>→</span></a>`).join('');
     const first = chapters[0];
-    app.innerHTML = `<div class="page detail"><a class="back" href="#/">← HOME</a><div class="detail-top"><div><div class="poster">${cover}</div></div><div><div class="eyebrow">NOVEL</div><h1>${esc(book.title)}</h1><p class="author">${esc(book.author)}</p><p class="summary">${esc(book.summary)}</p>${first ? `<a class="primary" href="${chapterHref(first, book, 0)}">START READING</a>` : ''}</div></div><div class="chapters"><div class="chapters-heading"><div><div class="eyebrow">READ</div><h2>Chapters</h2></div><span>${chapters.length ? chapters.length+' chapters' : 'No chapters'}</span></div>${links || '<div class="status">No chapters found.</div>'}</div></div>`;
+    app.innerHTML = `<div class="page detail"><a class="back" href="#/">← HOME</a><div class="detail-top"><div><div class="poster">${cover}</div></div><div><div class="eyebrow">NOVEL</div><h1>${esc(book.title)}</h1><p class="author">${esc(book.author)}</p><p class="summary">${esc(shortSummary(book.summary))}</p>${first ? `<a class="primary" href="${chapterHref(first, book, 0)}">START READING</a>` : ''}</div></div><div class="chapters"><div class="chapters-heading"><div><div class="eyebrow">READ</div><h2>Chapters</h2></div><span>${chapters.length ? chapters.length+' chapters' : 'No chapters'}</span></div>${links || '<div class="status">No chapters found.</div>'}</div></div>`;
+  }
+
+  async function getChapterContent(cid) {
+    const raw = unwrap(await api('/chapter/' + encodeURIComponent(cid)));
+    let content = pick(raw, ['content','text','body','chapterContent','chapter_content'], '');
+    if (content && typeof content === 'object') content = pick(content, ['content','text','body','value','path','url'], '');
+
+    const contentPath = pick(raw, ['contentPath','content_path','contentUrl','content_url'], '');
+    const candidate = contentPath || content;
+    if (candidate && typeof candidate === 'string' && (/^https?:\/\//i.test(candidate) || candidate.startsWith('/content/'))) {
+      try {
+        const loaded = unwrap(await api(candidate));
+        content = pick(loaded, ['content','text','body','value'], loaded);
+      } catch (_) {}
+    }
+    return {
+      title: String(pick(raw, ['title','name','chapterName'], 'Chapter')),
+      content: String(content || 'No chapter content available.')
+    };
   }
 
   async function recoverChapter(parts) {
     const cid = decodeURIComponent(parts[2] || '').trim();
     const bookId = decodeURIComponent(parts[3] || '').trim();
-    const title = decodeURIComponent(parts[4] || '').trim() || 'Novel';
+    const fallbackTitle = decodeURIComponent(parts[4] || '').trim() || 'Novel';
     if (!cid || !bookId) return;
 
     const book = await getBook(bookId);
     const chapters = await getChapters(book.id);
     const requested = Number(parts[5]);
-    const currentIndex = Number.isInteger(requested) && requested >= 0 ? requested : chapters.findIndex(ch => ch.id === cid);
-    const index = currentIndex >= 0 ? currentIndex : 0;
-    const current = chapters.find(ch => ch.id === cid) || chapters[index];
-    const data = unwrap(await api('/chapter/' + encodeURIComponent(cid)));
-    const content = String(pick(data, ['content','text','body'], 'No chapter content available.'));
-    const chapterTitle = String(pick(data, ['title','name','chapterName'], current?.title || title || 'Chapter'));
-    const paragraphs = content.replace(/\r/g, '').split(/\n{2,}/).map(x => x.trim()).filter(Boolean);
+    const foundIndex = chapters.findIndex(ch => ch.id === cid);
+    const index = Number.isInteger(requested) && requested >= 0 && requested < chapters.length ? requested : Math.max(0, foundIndex);
+    const current = chapters.find(ch => ch.id === cid) || chapters[index] || { title: fallbackTitle };
+    const chapter = await getChapterContent(cid);
+    const chapterTitle = chapter.title === 'Chapter' ? current.title : chapter.title;
+    const content = chapter.content.replace(/\r/g, '').trim();
+    const paragraphs = content.split(/\n{2,}/).map(x => x.trim()).filter(Boolean);
     const lines = paragraphs.length > 1 ? paragraphs : content.split(/\n+/).map(x => x.trim()).filter(Boolean);
     const previous = index > 0 ? chapters[index - 1] : null;
     const next = index < chapters.length - 1 ? chapters[index + 1] : null;
@@ -97,23 +124,34 @@
       if (route.startsWith('/novel/')) {
         const id = decodeURIComponent(route.slice(7)).trim();
         if (!id || !/^\d+$/.test(id)) return;
-        for (let i = 0; i < 40; i++) {
-          if (app.textContent.includes('Novel not found.')) break;
+        for (let i = 0; i < 20; i++) {
+          if (app.querySelector('.detail') || app.textContent.includes('Novel not found.')) break;
           await new Promise(r => setTimeout(r, 100));
         }
         if (app.textContent.includes('Novel not found.')) await recoverNovel(id);
       } else if (route.startsWith('/chapter/')) {
         const parts = route.split('/');
-        for (let i = 0; i < 40; i++) {
-          if (app.querySelector('.reader-shell') || app.textContent.includes('Open this chapter from a novel page')) break;
+        // A chapter URL is authoritative. If the main router leaves the user on the
+        // novel page or an error page, recover the reader from the URL itself.
+        for (let i = 0; i < 12; i++) {
+          if (app.querySelector('.reader-shell')) return;
           await new Promise(r => setTimeout(r, 100));
         }
-        if (!app.querySelector('.reader-shell') || app.textContent.includes('Open this chapter from a novel page')) await recoverChapter(parts);
+        if (!app.querySelector('.reader-shell')) await recoverChapter(parts);
       }
     } catch (_) {
-      // Leave the normal app error page visible if recovery fails.
+      // Keep the normal app visible if the API itself is unavailable.
     }
   }
+
+  document.addEventListener('click', event => {
+    const link = event.target.closest('a.chapter, a.chapter-nav-btn, a.chapter-nav-center');
+    if (!link || !link.getAttribute('href')?.startsWith('#/chapter/')) return;
+    event.preventDefault();
+    const href = link.getAttribute('href');
+    if (location.hash === href) recover();
+    else location.hash = href.slice(1);
+  }, true);
 
   window.addEventListener('DOMContentLoaded', recover);
   window.addEventListener('hashchange', recover);
