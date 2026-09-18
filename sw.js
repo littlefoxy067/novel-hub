@@ -1,4 +1,4 @@
-const CACHE = 'novelhub-static-v2';
+const CACHE = 'novelhub-static-v3';
 const STATIC = [
   '/',
   '/index.html',
@@ -9,6 +9,8 @@ const STATIC = [
   '/api-recovery.js',
   '/library.js',
   '/favicon.svg',
+  '/icon-192.png',
+  '/icon-512.png',
   '/manifest.webmanifest'
 ];
 
