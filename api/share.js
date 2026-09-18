@@ -83,32 +83,10 @@ module.exports = async function handler(req, res) {
   const book = await findNovel(id, source);
   const title = String(pick(book, ['title','name','novelName','bookName'], 'Novel Hub')).slice(0, 180);
   const author = String(pick(book, ['author','writer','authorName','novelAuthor'], ''));
-  let cover = pick(book, ['cover','coverUrl','cover_url','image','imageUrl','pic','thumb','poster'], '');
-  if (cover && typeof cover === 'object') cover = pick(cover, ['url','src','href'], '');
-  cover = String(cover || '');
-
-  
-function optimizedCoverUrl(cover) {
-  if (!/^https?:\/\//i.test(String(cover || ''))) return '';
-  try {
-    const url = new URL('https://wsrv.nl/');
-    url.searchParams.set('url', cover);
-    url.searchParams.set('w', '1200');
-    url.searchParams.set('h', '630');
-    url.searchParams.set('fit', 'contain');
-    url.searchParams.set('cbg', '07080d');
-    url.searchParams.set('output', 'jpg');
-    url.searchParams.set('q', '60');
-    return url.toString();
-  } catch (_) {
-    return '';
-  }
-}
-
   const origin = 'https://' + req.headers.host;
   const appUrl = origin + '/novel/' + encodeURIComponent(id);
   const description = ('Read ' + title + (author ? ' by ' + author : '') + ' on Novel Hub.').slice(0, 200);
-  const previewImage = 'https://files.catbox.moe/drqfvl.png';
+  const previewImage = 'https://files.catbox.moe/ig4q4j.jpg';
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
@@ -122,13 +100,14 @@ function optimizedCoverUrl(cover) {
     '<meta property="og:title" content="' + esc(title) + '">' +
     '<meta property="og:description" content="' + esc(description) + '">' +
     '<meta property="og:url" content="' + esc(appUrl) + '">' +
-    (previewImage ? '<meta property="og:image" content="' + esc(previewImage) + '">' +
-      '<meta property="og:image:secure_url" content="' + esc(previewImage) + '">' +
-      '<meta property="og:image:width" content="1200">' +
-      '<meta property="og:image:height" content="630">' +
-      '<meta property="og:image:type" content="image/png">' +
-      '<meta property="og:image:alt" content="' + esc(title) + '">' : '') +
-    (previewImage ? '<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="' + esc(previewImage) + '">' : '<meta name="twitter:card" content="summary">') +
+    '<meta property="og:image" content="' + esc(previewImage) + '">' +
+    '<meta property="og:image:secure_url" content="' + esc(previewImage) + '">' +
+    '<meta property="og:image:width" content="1200">' +
+    '<meta property="og:image:height" content="630">' +
+    '<meta property="og:image:type" content="image/jpeg">' +
+    '<meta property="og:image:alt" content="' + esc(title) + '">' +
+    '<meta name="twitter:card" content="summary_large_image">' +
+    '<meta name="twitter:image" content="' + esc(previewImage) + '">' +
     '</head><body>' +
     '<p>Opening <a href="' + esc(appUrl) + '">' + esc(title) + '</a>…</p>' +
     '<script>location.replace(' + JSON.stringify(appUrl) + ')</script>' +
