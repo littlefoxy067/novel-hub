@@ -36,6 +36,12 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
+  // Dynamic API responses must always come from the network.
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).catch(() => caches.match('/index.html')));
     return;
