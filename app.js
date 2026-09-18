@@ -517,8 +517,25 @@ function setupMenu() {
   const menu = $('#menuBtn');
   const nav = document.querySelector('.topbar nav');
   if (!menu || !nav) return;
-  menu.addEventListener('click', () => nav.classList.toggle('open'));
-  nav.addEventListener('click', () => nav.classList.remove('open'));
+  const close = () => {
+    document.body.classList.remove('menu-open');
+    menu.setAttribute('aria-expanded', 'false');
+  };
+  menu.setAttribute('aria-expanded', 'false');
+  menu.addEventListener('click', event => {
+    event.preventDefault();
+    event.stopPropagation();
+    const open = document.body.classList.toggle('menu-open');
+    menu.setAttribute('aria-expanded', String(open));
+  });
+  nav.addEventListener('click', event => {
+    if (event.target.closest('a')) close();
+  });
+  document.addEventListener('click', event => {
+    if (!document.body.classList.contains('menu-open')) return;
+    if (!event.target.closest('.topbar')) close();
+  });
+  window.addEventListener('popstate', close);
 }
 
 state.shelf = shelfLoad();
