@@ -436,7 +436,7 @@
   }
 
   async function shareNovel(book) {
-    const url = new URL(localBookHref(book), location.origin).href;
+    const url = new URL('/share/' + encodeURIComponent(book.id), location.origin).href;
     try {
       if (navigator.share) await navigator.share({ title: book.title, text: `Read ${book.title} on Novel Hub`, url });
       else if (navigator.clipboard) { await navigator.clipboard.writeText(url); toast('Novel link copied'); }
