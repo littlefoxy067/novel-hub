@@ -436,7 +436,10 @@
   }
 
   async function shareNovel(book) {
-    const url = new URL('/share/' + encodeURIComponent(book.id), location.origin);\n    url.searchParams.set('v', '3');\n    const shareUrl = url.href;
+    const url = new URL('/share/' + encodeURIComponent(book.id), location.origin);
+    if (book.detailPath) url.searchParams.set('source', book.detailPath);
+    url.searchParams.set('v', '5');
+    const shareUrl = url.href;
     try {
       if (navigator.share) await navigator.share({ title: book.title, text: `Read ${book.title} on Novel Hub`, url: shareUrl });
       else if (navigator.clipboard) { await navigator.clipboard.writeText(shareUrl); toast('Novel link copied'); }
@@ -521,6 +524,33 @@
 
   const observer = new MutationObserver(scheduleRefresh);
   observer.observe($('#app') || document.body, { childList: true, subtree: true });
+
+
+  let deferredInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    const button = $('#installBtn');
+    if (button) button.hidden = false;
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    const button = $('#installBtn');
+    if (button) button.hidden = true;
+    toast('Novel Hub installed');
+  });
+  document.addEventListener('click', async event => {
+    const button = event.target.closest('#installBtn');
+    if (!button || !deferredInstallPrompt) return;
+    button.disabled = true;
+    try {
+      await deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+    } catch (_) {}
+    deferredInstallPrompt = null;
+    button.hidden = true;
+    button.disabled = false;
+  }, true);
 
   try { getUserId(); } catch (_) {}
 
