@@ -106,8 +106,13 @@ function optimizedCoverUrl(cover) {
     '<meta property="og:title" content="' + esc(title) + '">' +
     '<meta property="og:description" content="' + esc(description) + '">' +
     '<meta property="og:url" content="' + esc(appUrl) + '">' +
-    (cover ? '<meta property="og:image" content="' + esc(cover) + '">' : '') +
-    (cover ? '<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="' + esc(cover) + '">' : '<meta name="twitter:card" content="summary">') +
+    (previewImage ? '<meta property="og:image" content="' + esc(previewImage) + '">' +
+      '<meta property="og:image:secure_url" content="' + esc(previewImage) + '">' +
+      '<meta property="og:image:width" content="1200">' +
+      '<meta property="og:image:height" content="630">' +
+      '<meta property="og:image:type" content="image/jpeg">' +
+      '<meta property="og:image:alt" content="' + esc(title) + '">' : '') +
+    (previewImage ? '<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="' + esc(previewImage) + '">' : '<meta name="twitter:card" content="summary">') +
     '</head><body>' +
     '<p>Opening <a href="' + esc(appUrl) + '">' + esc(title) + '</a>…</p>' +
     '<script>location.replace(' + JSON.stringify(appUrl) + ')</script>' +
