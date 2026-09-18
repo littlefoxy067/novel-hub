@@ -108,7 +108,7 @@ function optimizedCoverUrl(cover) {
   const origin = 'https://' + req.headers.host;
   const appUrl = origin + '/novel/' + encodeURIComponent(id);
   const description = ('Read ' + title + (author ? ' by ' + author : '') + ' on Novel Hub.').slice(0, 200);
-  const previewImage = origin + '/api/share-image?id=' + encodeURIComponent(id) + (source ? '&source=' + encodeURIComponent(source) : '');
+  const previewImage = 'https://files.catbox.moe/drqfvl.png';
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
@@ -126,7 +126,7 @@ function optimizedCoverUrl(cover) {
       '<meta property="og:image:secure_url" content="' + esc(previewImage) + '">' +
       '<meta property="og:image:width" content="1200">' +
       '<meta property="og:image:height" content="630">' +
-      '<meta property="og:image:type" content="image/jpeg">' +
+      '<meta property="og:image:type" content="image/png">' +
       '<meta property="og:image:alt" content="' + esc(title) + '">' : '') +
     (previewImage ? '<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="' + esc(previewImage) + '">' : '<meta name="twitter:card" content="summary">') +
     '</head><body>' +
