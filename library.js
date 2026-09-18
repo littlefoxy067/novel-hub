@@ -436,10 +436,10 @@
   }
 
   async function shareNovel(book) {
-    const url = new URL('/share/' + encodeURIComponent(book.id), location.origin).href;
+    const url = new URL('/share/' + encodeURIComponent(book.id), location.origin);\n    url.searchParams.set('v', '3');\n    const shareUrl = url.href;
     try {
-      if (navigator.share) await navigator.share({ title: book.title, text: `Read ${book.title} on Novel Hub`, url });
-      else if (navigator.clipboard) { await navigator.clipboard.writeText(url); toast('Novel link copied'); }
+      if (navigator.share) await navigator.share({ title: book.title, text: `Read ${book.title} on Novel Hub`, url: shareUrl });
+      else if (navigator.clipboard) { await navigator.clipboard.writeText(shareUrl); toast('Novel link copied'); }
     } catch (_) {}
   }
 
