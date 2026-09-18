@@ -461,6 +461,10 @@ function renderError(error) {
   app.innerHTML = `<div class="page detail"><div class="empty"><h2>Could not open this page</h2><p>${esc(text)}</p><a class="primary" href="/">RETURN HOME</a></div></div>`;
 }
 
+function renderNotFound() {
+  app.innerHTML = `<div class="page detail"><div class="empty not-found"><div class="eyebrow">404</div><h2>Page not found</h2><p>The fox couldn't find this page.</p><div class="not-found-actions"><a class="primary" href="/">RETURN HOME</a><a class="secondary" href="/genres">BROWSE GENRES</a></div></div></div>`;
+}
+
 function renderCurrent() {
   const token = ++state.routeToken;
   const url = new URL(window.location.href);
@@ -476,7 +480,7 @@ function renderCurrent() {
       else if (path === '/shelf') shelfPage();
       else if (parts[0] === 'novel') await renderNovelRoute(parts, url.searchParams, token);
       else if (parts[0] === 'chapter') await renderChapterRoute(parts, url.searchParams, token);
-      else { history.replaceState({}, '', '/'); await loadHome(token); return; }
+      else { renderNotFound(); }
       if (token === state.routeToken) app.focus?.({ preventScroll: true });
     } catch (error) {
       if (token === state.routeToken) renderError(error);
