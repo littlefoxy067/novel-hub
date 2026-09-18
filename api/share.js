@@ -38,7 +38,21 @@ function findBook(payload, id) {
   return null;
 }
 
-async function findNovel(id) {
+async function fetchNovelPath(path) {
+  try {
+    const response = await fetch('https://novel-api.nabaikabaiaguo.workers.dev' + path, { headers: { Accept: 'application/json' } });
+    if (!response.ok) return null;
+    const json = await response.json();
+    return unwrap(json);
+  } catch (_) { return null; }
+}
+
+async function findNovel(id, source = '') {
+  if (source) {
+    const path = source.startsWith('/') ? source : '/novel/' + encodeURIComponent(source);
+    const direct = await fetchNovelPath(path);
+    if (direct && typeof direct === 'object' && !Array.isArray(direct)) return direct;
+  }
   const paths = [
     '/search?q=' + encodeURIComponent(id) + '&p=1&l=30',
     '/featured?p=1&l=100',
@@ -60,12 +74,13 @@ async function findNovel(id) {
 
 module.exports = async function handler(req, res) {
   const id = String(req.query?.id || '').trim();
+  const source = String(req.query?.source || '').trim();
   if (!id || !/^[A-Za-z0-9._~-]+$/.test(id)) {
     res.status(400).send('Invalid novel ID');
     return;
   }
 
-  const book = await findNovel(id);
+  const book = await findNovel(id, source);
   const title = String(pick(book, ['title','name','novelName','bookName'], 'Novel Hub')).slice(0, 180);
   const author = String(pick(book, ['author','writer','authorName','novelAuthor'], ''));
   let cover = pick(book, ['cover','coverUrl','cover_url','image','imageUrl','pic','thumb','poster'], '');
@@ -90,9 +105,10 @@ function optimizedCoverUrl(cover) {
   }
 }
 
-  const appUrl = 'https://' + req.headers.host + '/novel/' + encodeURIComponent(id);
+  const origin = 'https://' + req.headers.host;
+  const appUrl = origin + '/novel/' + encodeURIComponent(id);
   const description = ('Read ' + title + (author ? ' by ' + author : '') + ' on Novel Hub.').slice(0, 200);
-  const previewImage = optimizedCoverUrl(cover);
+  const previewImage = origin + '/api/share-image?id=' + encodeURIComponent(id) + (source ? '&source=' + encodeURIComponent(source) : '');
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
