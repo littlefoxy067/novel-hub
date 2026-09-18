@@ -23,6 +23,8 @@
   <title>Novel Hub</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/detail-inline.css">
   <link rel="stylesheet" href="/library.css">
@@ -32,6 +34,7 @@
   <header class="topbar">
     <a class="logo" href="/" aria-label="Novel Hub home"><span>🦊</span> NOVEL<span>HUB</span></a>
     <nav><a href="/">Home</a><a href="/genres">Genres</a><a href="/shelf">My Shelf</a></nav>
+    <button id="installBtn" class="install-btn" type="button" hidden>INSTALL APP</button>
     <form id="navSearch" class="nav-search" role="search">
       <span>⌕</span><input id="navSearchInput" type="search" placeholder="Search novels..." autocomplete="off"><button aria-label="Search">→</button>
     </form>
