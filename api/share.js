@@ -72,8 +72,27 @@ module.exports = async function handler(req, res) {
   if (cover && typeof cover === 'object') cover = pick(cover, ['url','src','href'], '');
   cover = String(cover || '');
 
+  
+function optimizedCoverUrl(cover) {
+  if (!/^https?:\/\//i.test(String(cover || ''))) return '';
+  try {
+    const url = new URL('https://wsrv.nl/');
+    url.searchParams.set('url', cover);
+    url.searchParams.set('w', '1200');
+    url.searchParams.set('h', '630');
+    url.searchParams.set('fit', 'contain');
+    url.searchParams.set('cbg', '07080d');
+    url.searchParams.set('output', 'jpg');
+    url.searchParams.set('q', '60');
+    return url.toString();
+  } catch (_) {
+    return '';
+  }
+}
+
   const appUrl = 'https://' + req.headers.host + '/novel/' + encodeURIComponent(id);
   const description = ('Read ' + title + (author ? ' by ' + author : '') + ' on Novel Hub.').slice(0, 200);
+  const previewImage = optimizedCoverUrl(cover);
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
