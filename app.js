@@ -260,6 +260,25 @@ async function getChapters(id, book = null) {
   }
 }
 
+async function getAllChapters(id) {
+  const chapters = [];
+  const seen = new Set();
+  for (let page = 1; page <= 50; page += 1) {
+    const payload = await api('/chapters?id=' + encodeURIComponent(id) + '&order=asc&p=' + page + '&l=100');
+    const rows = normalizeChapters(payload);
+    if (!rows.length) break;
+    let added = 0;
+    for (const row of rows) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      chapters.push({ ...row, index: chapters.length });
+      added += 1;
+    }
+    if (added === 0) break;
+  }
+  return chapters;
+}
+
 function inlineSummaryMore() {
   document.querySelectorAll('.detail .summary').forEach(summary => {
     if (summary.dataset.inlineMore === 'true') return;
@@ -286,9 +305,10 @@ function renderNovel(book, chapters) {
   const progress = progressLoad();
   const first = chapters[0];
   const continueChapter = chapters.find(ch => Number(progress[ch.id]) > 0) || first;
-  app.innerHTML = `<div class="page detail"><a class="back" href="/">← HOME</a><div class="detail-top"><div>${poster(book)}</div><div><div class="eyebrow">NOVEL</div><h1>${esc(book.title)}</h1><p class="author">${esc(book.author)}</p><p class="summary">${esc(book.summary)}</p><button type="button" class="primary" id="saveBook">${isSaved(book) ? '✓ SAVED' : '+ ADD TO SHELF'}</button>${continueChapter ? `<a class="continue-reading" href="${chapterHref(continueChapter, book, continueChapter.index)}">${continueChapter === first ? 'START READING' : 'CONTINUE READING'} <span>→</span></a>` : ''}</div></div><div class="chapters"><div class="chapters-heading"><div><div class="eyebrow">READ</div><h2>Chapters</h2></div><span>${chapters.length ? chapters.length + ' chapters' : 'No chapters'}</span></div><div id="chapterList">${chapters.length ? chapters.map((chapter, index) => `<a class="chapter" href="${chapterHref(chapter, book, index)}"><span>${esc(chapter.title)}</span><span>${Number(progress[chapter.id]) > 0 ? '↗' : '→'}</span></a>`).join('') : '<div class="status">No chapters found.</div>'}</div></div></div>`;
+  app.innerHTML = `<div class="page detail"><a class="back" href="/">← HOME</a><div class="detail-top"><div>${poster(book)}</div><div><div class="eyebrow">NOVEL</div><h1>${esc(book.title)}</h1><p class="author">${esc(book.author)}</p><p class="summary">${esc(book.summary)}</p><div class="novel-actions"><button type="button" class="primary" id="saveBook">${isSaved(book) ? '✓ SAVED' : '+ ADD TO SHELF'}</button>${continueChapter ? `<a class="continue-reading" href="${chapterHref(continueChapter, book, continueChapter.index)}">${continueChapter === first ? 'START READING' : 'CONTINUE READING'} <span>→</span></a>` : ''}<button type="button" class="secondary pdf-action" id="downloadBookPdf" ${chapters.length ? '' : 'disabled'}>SAVE AS PDF</button></div><p class="pdf-note">Opens a clean, print-ready copy. Choose “Save as PDF” in your browser’s print dialog.</p></div></div><div class="chapters"><div class="chapters-heading"><div><div class="eyebrow">READ</div><h2>Chapters</h2></div><span>${chapters.length ? chapters.length + ' chapters' : 'No chapters'}</span></div><div id="chapterList">${chapters.length ? chapters.map((chapter, index) => `<a class="chapter" href="${chapterHref(chapter, book, index)}"><span>${esc(chapter.title)}</span><span>${Number(progress[chapter.id]) > 0 ? '↗' : '→'}</span></a>`).join('') : '<div class="status">No chapters found.</div>'}</div></div></div>`;
   inlineSummaryMore();
   $('#saveBook')?.addEventListener('click', () => { toggleShelf(book); const button = $('#saveBook'); if (button) button.textContent = isSaved(book) ? '✓ SAVED' : '+ ADD TO SHELF'; });
+  $('#downloadBookPdf')?.addEventListener('click', event => downloadBookPdf(book, event.currentTarget));
 }
 
 async function renderNovelRoute(parts, params, token) {
@@ -313,6 +333,63 @@ async function getChapterContent(id) {
   return { title: String(pick(raw, ['title', 'name', 'chapterName'], 'Chapter')), content: String(content || 'No chapter content available.') };
 }
 
+function printDocument(book, chapters) {
+  const contents = chapters.map((chapter, index) => {
+    const title = chapter.title && chapter.title !== 'Chapter' ? chapter.title : 'Chapter ' + (index + 1);
+    const paragraphs = String(chapter.content || '').replace(/\r/g, '').trim().split(/\n{2,}/).map(part => part.trim()).filter(Boolean);
+    const blocks = (paragraphs.length ? paragraphs : [String(chapter.content || '')]).map(text => `<p>${esc(text).replace(/\n/g, '<br>')}</p>`).join('');
+    return `<section class="chapter" id="chapter-${index + 1}"><h2>Chapter ${index + 1}</h2><h3>${esc(title)}</h3>${blocks}</section>`;
+  }).join('');
+  const contentsList = chapters.map((chapter, index) => {
+    const title = chapter.title && chapter.title !== 'Chapter' ? chapter.title : 'Chapter ' + (index + 1);
+    return `<li><a href="#chapter-${index + 1}">${index + 1}. ${esc(title)}</a></li>`;
+  }).join('');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(book.title)} — Novel Hub</title><style>
+    @page{size:auto;margin:22mm 19mm}*{box-sizing:border-box}body{margin:0;color:#211d18;background:#fff;font:11pt/1.72 Georgia,'Times New Roman',serif}.cover{min-height:80vh;display:flex;flex-direction:column;justify-content:center;page-break-after:always}.brand{font:700 9pt/1.4 Arial,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#55716f}.cover h1{font:700 32pt/1.12 Georgia,serif;margin:18pt 0 8pt;overflow-wrap:anywhere}.author{font:italic 13pt Georgia,serif;color:#675d53}.summary{max-width:34em;margin-top:24pt;color:#514940}.contents{page-break-after:always}.contents h2{font:700 19pt Georgia,serif}.contents ol{padding-left:22pt}.contents li{margin:5pt 0;break-inside:avoid}.contents a{color:inherit;text-decoration:none}.chapter{break-before:page}.chapter h2{font:700 10pt Arial,sans-serif;letter-spacing:.13em;text-transform:uppercase;color:#55716f;margin:0 0 5pt}.chapter h3{font:700 22pt/1.2 Georgia,serif;margin:0 0 28pt}.chapter p{margin:0 0 1em;orphans:3;widows:3}.chapter p:first-of-type:first-letter{font-size:1.35em}.endnote{margin-top:40pt;padding-top:10pt;border-top:1px solid #ddd;color:#777;font:9pt Arial,sans-serif}@media screen{body{max-width:780px;margin:0 auto;padding:56px 30px}.cover{min-height:58vh}.chapter{margin-top:50px;border-top:1px solid #ddd;padding-top:30px}.print-tip{position:sticky;top:12px;display:block;margin:0 auto 32px;padding:12px 16px;border:0;border-radius:6px;background:#193c3b;color:white;font:700 13px Arial,sans-serif;cursor:pointer}.contents a{color:#225c58;text-decoration:underline}}@media print{.print-tip{display:none}.cover{min-height:0;height:220mm}.chapter{break-before:page}.chapter:first-of-type{break-before:page}}
+  </style></head><body><button class="print-tip" onclick="window.print()">PRINT / SAVE AS PDF</button><header class="cover"><div class="brand">Novel Hub · Reading edition</div><h1>${esc(book.title)}</h1><div class="author">${esc(book.author || 'Unknown author')}</div>${book.summary ? `<p class="summary">${esc(book.summary)}</p>` : ''}<p class="endnote">${chapters.length} chapters · Prepared for personal reading</p></header><nav class="contents"><h2>Contents</h2><ol>${contentsList}</ol></nav><main>${contents}</main><p class="endnote">End of book · Novel Hub</p><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),500));</script></body></html>`;
+}
+
+async function downloadBookPdf(book, button) {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) { toast('Allow pop-ups to prepare a PDF-ready copy'); return; }
+  try { printWindow.opener = null; } catch (_) {}
+  printWindow.document.open();
+  printWindow.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Preparing book…</title></head><body style="font:16px system-ui;padding:32px;color:#333">Preparing your reading copy…</body></html>');
+  printWindow.document.close();
+  const originalLabel = button?.textContent || 'SAVE AS PDF';
+  const compactButton = button?.classList.contains('reader-pdf-tool');
+  if (button) { button.disabled = true; button.textContent = compactButton ? 'PDF…' : 'PREPARING…'; button.setAttribute('aria-live', 'polite'); }
+  try {
+    const chapters = await getAllChapters(book.id);
+    if (!chapters.length) throw new Error('No chapters are available for this novel.');
+    if (chapters.length >= 5000) throw new Error('This novel exceeds the export limit of 5,000 chapters.');
+    const loaded = [];
+    for (let offset = 0; offset < chapters.length; offset += 4) {
+      const batch = chapters.slice(offset, offset + 4);
+      const results = await Promise.all(batch.map(async chapter => ({ chapter, content: await getChapterContent(chapter.id) })));
+      loaded.push(...results.map(({ chapter, content }) => {
+        if (!content.content || content.content === 'No chapter content available.' || /^https?:\/\/|^\/?content\//i.test(content.content)) {
+          throw new Error(`Could not retrieve “${chapter.title}”. No PDF was created.`);
+        }
+        return { title: content.title && content.title !== 'Chapter' ? content.title : chapter.title, content: content.content };
+      }));
+      if (button && !compactButton) button.textContent = `PREPARING ${loaded.length}/${chapters.length}`;
+      if (printWindow.closed) throw new Error('The print window was closed before the book was ready.');
+      printWindow.document.body.textContent = `Preparing your reading copy… ${loaded.length} of ${chapters.length} chapters`;
+    }
+    if (printWindow.closed) return;
+    printWindow.document.open();
+    printWindow.document.write(printDocument(book, loaded));
+    printWindow.document.close();
+    toast('Reading copy ready. Choose “Save as PDF” in the print dialog.');
+  } catch (error) {
+    if (!printWindow.closed) printWindow.close();
+    toast(error instanceof Error ? error.message : 'Could not prepare this book. Please try again.');
+  } finally {
+    if (button?.isConnected) { button.disabled = false; button.textContent = originalLabel; }
+  }
+}
+
 function readerSettings(prefs) {
   const active = (value, current) => value === current ? 'active' : '';
   return `<div id="readerSettings" class="reader-settings" hidden><div class="reader-settings-head"><b>Reader settings</b><button id="readerCloseSettings" type="button">×</button></div><div class="reader-setting-group"><span>TEXT SIZE</span><div class="reader-stepper"><button id="fontMinus" type="button">−</button><b id="fontValue">${prefs.fontSize}px</b><button id="fontPlus" type="button">+</button></div></div><div class="reader-setting-group"><span>READING WIDTH</span><div class="reader-choice"><button type="button" data-width="narrow" class="${active('narrow', prefs.width)}">NARROW</button><button type="button" data-width="comfortable" class="${active('comfortable', prefs.width)}">COMFY</button><button type="button" data-width="wide" class="${active('wide', prefs.width)}">WIDE</button></div></div><div class="reader-setting-group"><span>PAGE THEME</span><div class="reader-choice"><button type="button" data-theme="dark" class="${active('dark', prefs.theme)}">DARK</button><button type="button" data-theme="sepia" class="${active('sepia', prefs.theme)}">SEPIA</button><button type="button" data-theme="black" class="${active('black', prefs.theme)}">BLACK</button></div></div><div class="reader-setting-group"><span>PARAGRAPH SPACE</span><div class="reader-choice"><button type="button" data-spacing="1.7" class="${prefs.lineHeight <= 1.7 ? 'active' : ''}">TIGHT</button><button type="button" data-spacing="1.9" class="${prefs.lineHeight > 1.7 && prefs.lineHeight < 2.1 ? 'active' : ''}">COMFY</button><button type="button" data-spacing="2.1" class="${prefs.lineHeight >= 2.1 ? 'active' : ''}">OPEN</button></div></div></div>`;
@@ -330,6 +407,36 @@ function renderReader(book, chapters, current, chapter) {
   app.innerHTML = `<div class="reader-shell" id="readerRoot" data-width="${prefs.width}" data-theme="${prefs.theme}"><div class="reader-progress"><div id="readerProgressFill"></div></div><header class="reader-topbar"><div class="reader-top-left"><a class="reader-back" href="${novelHref(book)}">← <span>BACK</span></a><div class="reader-book"><small>${esc(book.title)}</small><b>${esc(chapter.title === 'Chapter' ? current.title : chapter.title)}</b></div></div><div class="reader-top-tools"><span id="readerProgressText" class="reader-progress-text">0%</span><button id="readerOpenSettings" class="reader-tool" type="button">Aa</button><button id="readerOpenChapters" class="reader-tool" type="button">☰</button></div></header>${readerSettings(prefs)}<main class="reader-main"><div class="reader-kicker"><span>${esc(book.title)}</span><i>·</i><span>CHAPTER ${currentIndex + 1}</span></div><article class="reader-article" id="readerArticle" tabindex="-1"><h1>${esc(chapter.title === 'Chapter' ? current.title : chapter.title)}</h1>${paragraphs.map(p => `<p>${esc(p)}</p>`).join('')}</article><nav class="chapter-nav" aria-label="Chapter navigation">${previous ? `<a class="chapter-nav-btn" href="${chapterHref(previous, book, currentIndex - 1)}"><span>←</span><small>PREVIOUS</small><b>${esc(previous.title)}</b></a>` : '<span class="chapter-nav-btn disabled"><span>—</span><small>PREVIOUS</small><b>Beginning</b></span>'}<a class="chapter-nav-center" href="${novelHref(book)}"><span>CHAPTER</span><b>${currentIndex + 1} / ${chapters.length || '—'}</b><small>VIEW ALL</small></a>${next ? `<a class="chapter-nav-btn next" href="${chapterHref(next, book, currentIndex + 1)}"><small>NEXT</small><b>${esc(next.title)}</b><span>→</span></a>` : '<span class="chapter-nav-btn disabled next"><small>NEXT</small><b>End of story</b><span>—</span></span>'}</nav></main><button id="readerTop" class="reader-top" type="button">↑</button><div id="readerOverlay" class="reader-overlay" hidden></div><aside id="readerDrawer" class="reader-drawer" aria-hidden="true"><div class="reader-drawer-head"><div><div class="eyebrow">NOVEL</div><h2>${esc(book.title)}</h2></div><button id="readerCloseChapters" type="button">×</button></div><input id="readerChapterSearch" class="reader-chapter-search" type="search" placeholder="Find a chapter..."><div id="readerChapterList" class="reader-chapter-list">${chapters.map((item, index) => `<a class="reader-chapter ${index === currentIndex ? 'active' : ''}" href="${chapterHref(item, book, index)}"><span>${String(index + 1).padStart(2, '0')}</span><b>${esc(item.title)}</b></a>`).join('')}</div></aside></div>`;
 
   const root = $('#readerRoot');
+  const tools = $('.reader-top-tools');
+  const pdfButton = document.createElement('button');
+  pdfButton.type = 'button';
+  pdfButton.className = 'reader-tool reader-pdf-tool';
+  pdfButton.textContent = 'PDF';
+  pdfButton.setAttribute('aria-label', 'Save this novel as a PDF');
+  pdfButton.title = 'Save this novel as PDF';
+  tools?.insertBefore(pdfButton, $('#readerOpenSettings'));
+  pdfButton.addEventListener('click', () => downloadBookPdf(book, pdfButton));
+  const settings = $('#readerSettings');
+  const drawer = $('#readerDrawer');
+  settings?.setAttribute('role', 'dialog');
+  settings?.setAttribute('aria-label', 'Reader settings');
+  drawer?.setAttribute('role', 'dialog');
+  drawer?.setAttribute('aria-modal', 'true');
+  drawer?.setAttribute('aria-label', 'Book chapters');
+  $('#readerOpenSettings')?.setAttribute('aria-label', 'Open reading settings');
+  $('#readerOpenSettings')?.setAttribute('aria-controls', 'readerSettings');
+  $('#readerOpenSettings')?.setAttribute('aria-expanded', 'false');
+  $('#readerOpenChapters')?.setAttribute('aria-label', 'Open chapter list');
+  $('#readerOpenChapters')?.setAttribute('aria-controls', 'readerDrawer');
+  $('#readerOpenChapters')?.setAttribute('aria-expanded', 'false');
+  $('#readerCloseSettings')?.setAttribute('aria-label', 'Close reader settings');
+  $('#readerCloseChapters')?.setAttribute('aria-label', 'Close chapter list');
+  $('#readerChapterSearch')?.setAttribute('aria-label', 'Search chapters');
+  const progressStatus = $('#readerProgressText');
+  progressStatus?.setAttribute('role', 'progressbar');
+  progressStatus?.setAttribute('aria-label', 'Reading progress');
+  progressStatus?.setAttribute('aria-valuemin', '0');
+  progressStatus?.setAttribute('aria-valuemax', '100');
   const applyPrefs = () => {
     root.dataset.width = prefs.width;
     root.dataset.theme = prefs.theme;
@@ -350,15 +457,25 @@ function renderReader(book, chapters, current, chapter) {
   document.querySelectorAll('[data-theme]').forEach(btn => btn.addEventListener('click', () => { prefs.theme = btn.dataset.theme; applyPrefs(); }));
   document.querySelectorAll('[data-spacing]').forEach(btn => btn.addEventListener('click', () => { prefs.lineHeight = Number(btn.dataset.spacing); applyPrefs(); }));
 
-  const settings = $('#readerSettings');
-  const drawer = $('#readerDrawer');
   const overlay = $('#readerOverlay');
-  $('#readerOpenSettings')?.addEventListener('click', () => { if (settings) settings.hidden = false; });
-  $('#readerCloseSettings')?.addEventListener('click', () => { if (settings) settings.hidden = true; });
-  const closeDrawer = () => { drawer?.classList.remove('open'); drawer?.setAttribute('aria-hidden', 'true'); if (overlay) overlay.hidden = true; };
-  $('#readerOpenChapters')?.addEventListener('click', () => { drawer?.classList.add('open'); drawer?.setAttribute('aria-hidden', 'false'); if (overlay) overlay.hidden = false; });
+  $('#readerOpenSettings')?.addEventListener('click', event => { if (drawer?.classList.contains('open')) closeDrawer(); if (settings) settings.hidden = false; event.currentTarget.setAttribute('aria-expanded', 'true'); });
+  $('#readerCloseSettings')?.addEventListener('click', () => { if (settings) settings.hidden = true; $('#readerOpenSettings')?.setAttribute('aria-expanded', 'false'); $('#readerOpenSettings')?.focus(); });
+  const closeDrawer = () => { drawer?.classList.remove('open'); drawer?.setAttribute('aria-hidden', 'true'); if (overlay) overlay.hidden = true; $('#readerOpenChapters')?.setAttribute('aria-expanded', 'false'); $('#readerOpenChapters')?.focus(); };
+  $('#readerOpenChapters')?.addEventListener('click', event => { if (settings) settings.hidden = true; $('#readerOpenSettings')?.setAttribute('aria-expanded', 'false'); drawer?.classList.add('open'); drawer?.setAttribute('aria-hidden', 'false'); if (overlay) overlay.hidden = false; event.currentTarget.setAttribute('aria-expanded', 'true'); $('#readerCloseChapters')?.focus(); });
   $('#readerCloseChapters')?.addEventListener('click', closeDrawer);
   overlay?.addEventListener('click', closeDrawer);
+  root?.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      if (drawer?.classList.contains('open')) closeDrawer();
+      if (settings && !settings.hidden) { settings.hidden = true; $('#readerOpenSettings')?.setAttribute('aria-expanded', 'false'); $('#readerOpenSettings')?.focus(); }
+    }
+    if (event.key !== 'Tab' || !drawer?.classList.contains('open')) return;
+    const items = [...drawer.querySelectorAll('button:not([disabled]), input:not([disabled]), a[href]')].filter(item => item.getClientRects().length);
+    if (!items.length) return;
+    const lastItem = items[items.length - 1];
+    if (event.shiftKey && document.activeElement === items[0]) { event.preventDefault(); lastItem.focus(); }
+    else if (!event.shiftKey && document.activeElement === lastItem) { event.preventDefault(); items[0].focus(); }
+  });
   $('#readerChapterSearch')?.addEventListener('input', event => { const q = event.target.value.toLowerCase().trim(); document.querySelectorAll('.reader-chapter').forEach(link => { link.hidden = Boolean(q) && !link.textContent.toLowerCase().includes(q); }); });
 
   let ticking = false;
@@ -372,7 +489,7 @@ function renderReader(book, chapters, current, chapter) {
       const fill = $('#readerProgressFill');
       if (fill) fill.style.transform = `scaleX(${value})`;
       const label = $('#readerProgressText');
-      if (label) label.textContent = Math.round(value * 100) + '%';
+      if (label) { label.textContent = Math.round(value * 100) + '%'; label.setAttribute('aria-valuenow', String(Math.round(value * 100))); }
       progressSave(current.id, value);
       $('#readerTop')?.classList.toggle('visible', value > 0.08);
     });

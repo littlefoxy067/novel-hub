@@ -1,4 +1,4 @@
-const CACHE = 'novelhub-static-v4';
+const CACHE = 'novelhub-static-v5';
 const STATIC = [
   '/',
   '/index.html',
@@ -6,6 +6,7 @@ const STATIC = [
   '/detail-inline.css',
   '/library.css',
   '/finishing-touches.css',
+  '/reader-polish.css',
   '/app.js',
   '/api-recovery.js',
   '/library.js',
