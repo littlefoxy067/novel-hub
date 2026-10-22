@@ -1,0 +1,46 @@
+/* Android WebView refinements; the host Activity applies system-bar and cutout insets. */
+html, body { width: 100%; min-width: 0; overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+img, video, canvas { max-width: 100%; }
+a, button, input, select, textarea { touch-action: manipulation; }
+.menu-btn { min-width: 44px; min-height: 44px; display: inline-grid; place-items: center; }
+.nav-search button { min-height: 44px; }
+.reader-top-tools > button { min-height: 44px; }
+.reader-back { min-height: 44px; }
+.reader-drawer-head button, .reader-settings-head button { width: 44px; height: 44px; }
+.reader-settings { padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+.footer { padding-bottom: max(28px, env(safe-area-inset-bottom)); }
+
+@media (max-width: 420px) {
+  .topbar { gap: 6px; padding-inline: 12px; }
+  .logo { font-size: 13px; }
+  .nav-search { min-width: 0; max-width: none; }
+  .nav-search span { padding-left: 8px; }
+  .nav-search input { padding-inline: 6px; }
+  .nav-search button { width: 40px; }
+  .reader-topbar { gap: 6px; padding-inline: 12px; }
+  .reader-top-left, .reader-top-tools { gap: 5px; }
+  .reader-book { padding-left: 7px; }
+  .reader-book small { max-width: 22vw; }
+  .reader-book b { max-width: 24vw; font-size: 12px; }
+  .reader-back { gap: 4px; font-size: 9px; }
+  .reader-top-tools > button { min-width: 36px; padding-inline: 5px; font-size: 9px; }
+  .reader-progress-text { min-width: 25px; font-size: 9px; }
+  .reader-main { width: calc(100% - 28px); padding-top: 30px; }
+  .reader-article { margin-top: 24px; }
+  .chapter-nav { grid-template-columns: minmax(0, 1fr) 76px minmax(0, 1fr); gap: 6px; }
+  .chapter-nav-btn, .chapter-nav-center { min-height: 74px; padding: 9px 6px; }
+  .chapter-nav-btn b { font-size: 10px; }
+  .chapter-nav-btn small, .chapter-nav-center span { font-size: 8px; }
+  .reader-drawer { padding: 18px 16px; }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .hero { height: min(560px, 100svh); }
+  .hero-content { padding-bottom: 54px; }
+  .reader-topbar { min-height: 56px; }
+  .reader-main { padding-top: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

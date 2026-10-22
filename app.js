@@ -350,7 +350,10 @@ function printDocument(book, chapters) {
 }
 
 async function downloadBookPdf(book, button) {
-  const nativePrint = typeof window.NovelHubAndroid?.printHtml === 'function';
+  const nativeBridge = window.NovelHubAndroid;
+  const nativeAndroidApp = /NovelHubAndroidApp\//.test(navigator.userAgent);
+  const nativePrint = typeof nativeBridge?.postMessage === 'function' || typeof nativeBridge?.printHtml === 'function';
+  if (nativeAndroidApp && !nativePrint) { toast('The Android PDF service is unavailable. Update Novel Hub and try again.'); return; }
   const printWindow = nativePrint ? null : window.open('', '_blank');
   if (!nativePrint && !printWindow) { toast('Allow pop-ups to prepare a PDF-ready copy'); return; }
   if (printWindow) {
@@ -383,7 +386,11 @@ async function downloadBookPdf(book, button) {
     if (printWindow?.closed) return;
     const html = printDocument(book, loaded);
     if (nativePrint) {
-      window.NovelHubAndroid.printHtml(html, book.title);
+      if (typeof nativeBridge.postMessage === 'function') {
+        nativeBridge.postMessage(JSON.stringify({ action: 'printHtml', title: book.title, html }));
+      } else {
+        nativeBridge.printHtml(html, book.title);
+      }
       toast('Choose “Save as PDF” in the Android print sheet.');
     } else {
       printWindow.document.open();

@@ -2,4 +2,4 @@ android/.gradle/
 android/**/build/
 android/local.properties
 
-NovelHub-debug.apk
+NovelHub-Android.apk
