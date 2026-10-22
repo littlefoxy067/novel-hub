@@ -7,7 +7,7 @@ const BOOK_INDEX_KEY = 'novelhub-book-index-v1';
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 
-const state = { home: [], shelf: [], hero: 0, timer: null, loading: false, routeToken: 0 };
+const state = { home: [], shelf: [], hero: 0, timer: null, routeToken: 0 };
 const unsafe = /\b(18\+|adult|explicit|erotica|hentai|porn|smut|nsfw)\b/i;
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -175,28 +175,24 @@ function renderHome() {
   document.querySelectorAll('[data-hero]').forEach(button => button.addEventListener('click', () => { state.hero = Number(button.dataset.hero) || 0; renderHome(); }));
   $('[data-hero-prev]')?.addEventListener('click', () => { const count = Math.min(6, books.length); if (!count) return; state.hero = (state.hero - 1 + count) % count; renderHome(); });
   $('[data-hero-next]')?.addEventListener('click', () => { const count = Math.min(6, books.length); if (!count) return; state.hero = (state.hero + 1) % count; renderHome(); });
-  if (books.length > 1) state.timer = setInterval(() => { state.hero = (state.hero + 1) % Math.min(6, books.length); renderHome(); }, 6000);
+  if (books.length > 1 && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    state.timer = setInterval(() => { state.hero = (state.hero + 1) % Math.min(6, books.length); renderHome(); }, 6000);
+  }
 }
 
 async function loadHome(token) {
-  if (state.loading) return;
-  state.loading = true;
   app.innerHTML = '<div class="loading-page"><div class="loader"></div><p>LOADING NOVEL HUB...</p></div>';
-  try {
-    const paths = ['/featured?p=1&l=18', '/rankings?rank=1&p=1&l=18', '/search?q=popular&p=1&l=18'];
-    const results = await Promise.allSettled(paths.map(api));
-    if (token !== state.routeToken) return;
-    const merged = results.flatMap(result => result.status === 'fulfilled' ? normalizeList(result.value) : []);
-    const unique = [];
-    const seen = new Set();
-    for (const book of merged) { if (!book.id || seen.has(book.id)) continue; seen.add(book.id); unique.push(book); }
-    state.home = unique;
-    state.hero = 0;
-    rememberBooks(unique);
-    renderHome();
-  } finally {
-    state.loading = false;
-  }
+  const paths = ['/featured?p=1&l=18', '/rankings?rank=1&p=1&l=18', '/search?q=popular&p=1&l=18'];
+  const results = await Promise.allSettled(paths.map(api));
+  if (token !== state.routeToken) return;
+  const merged = results.flatMap(result => result.status === 'fulfilled' ? normalizeList(result.value) : []);
+  const unique = [];
+  const seen = new Set();
+  for (const book of merged) { if (!book.id || seen.has(book.id)) continue; seen.add(book.id); unique.push(book); }
+  state.home = unique;
+  state.hero = 0;
+  rememberBooks(unique);
+  renderHome();
 }
 
 function getReaderPrefs() {
@@ -524,6 +520,7 @@ function setupMenu() {
   const close = () => {
     document.body.classList.remove('menu-open');
     menu.setAttribute('aria-expanded', 'false');
+    menu.setAttribute('aria-label', 'Open menu');
   };
   menu.setAttribute('aria-expanded', 'false');
   menu.addEventListener('click', event => {
@@ -531,6 +528,7 @@ function setupMenu() {
     event.stopPropagation();
     const open = document.body.classList.toggle('menu-open');
     menu.setAttribute('aria-expanded', String(open));
+    menu.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
   });
   nav.addEventListener('click', event => {
     if (event.target.closest('a')) close();
@@ -538,6 +536,12 @@ function setupMenu() {
   document.addEventListener('click', event => {
     if (!document.body.classList.contains('menu-open')) return;
     if (!event.target.closest('.topbar')) close();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && document.body.classList.contains('menu-open')) {
+      close();
+      menu.focus();
+    }
   });
   window.addEventListener('popstate', close);
 }

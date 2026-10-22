@@ -1,0 +1,46 @@
+/* Small, additive accessibility and responsive refinements. */
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 100000;
+  top: 10px;
+  left: 10px;
+  padding: 11px 15px;
+  transform: translateY(-160%);
+  border: 1px solid var(--cyan);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+.skip-link:focus { transform: translateY(0); }
+
+button, a, input { -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: not-allowed; }
+input::placeholder { color: #8d95a5; opacity: 1; }
+
+.poster img { background: #151a24; }
+.poster-link:focus-visible .poster,
+.card:focus-within .poster { border-color: var(--cyan); }
+
+@media (max-width: 600px) {
+  .nav-search button { min-width: 42px; }
+  .primary, .secondary, .more-btn, .shelf-btn, .genre,
+  .chapter, .chapter-nav-btn, .local-tool { min-height: 42px; }
+  .shelf-btn { padding-inline: 8px; }
+  .empty { padding: 34px 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

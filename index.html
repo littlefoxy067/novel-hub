@@ -28,17 +28,19 @@
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/detail-inline.css">
   <link rel="stylesheet" href="/library.css">
+  <link rel="stylesheet" href="/finishing-touches.css">
 </head>
 <body>
   <div class="bg-noise" aria-hidden="true"></div>
+  <a class="skip-link" href="#app">Skip to content</a>
   <header class="topbar">
     <a class="logo" href="/" aria-label="Novel Hub home"><span>🦊</span> NOVEL<span>HUB</span></a>
-    <nav><a href="/">Home</a><a href="/genres">Genres</a><a href="/shelf">My Shelf</a></nav>
+    <nav aria-label="Main navigation"><a href="/">Home</a><a href="/genres">Genres</a><a href="/shelf">My Shelf</a></nav>
     <button id="installBtn" class="install-btn" type="button" hidden>INSTALL APP</button>
-    <form id="navSearch" class="nav-search" role="search">
-      <span>⌕</span><input id="navSearchInput" type="search" placeholder="Search novels..." autocomplete="off"><button aria-label="Search">→</button>
+    <form id="navSearch" class="nav-search" role="search" aria-label="Search novels">
+      <span aria-hidden="true">⌕</span><input id="navSearchInput" type="search" placeholder="Search novels..." autocomplete="off" aria-label="Search novels"><button type="submit" aria-label="Submit search">→</button>
     </form>
-    <button id="menuBtn" class="menu-btn" type="button" aria-label="Open menu">☰</button>
+    <button id="menuBtn" class="menu-btn" type="button" aria-label="Open menu" aria-expanded="false">☰</button>
   </header>
   <main id="app" tabindex="-1"></main>
   <footer class="footer"><div><b>🦊 NOVELHUB</b><span>Stories worth getting lost in.</span></div><span>FOXY TECH</span></footer>
