@@ -350,12 +350,15 @@ function printDocument(book, chapters) {
 }
 
 async function downloadBookPdf(book, button) {
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) { toast('Allow pop-ups to prepare a PDF-ready copy'); return; }
-  try { printWindow.opener = null; } catch (_) {}
-  printWindow.document.open();
-  printWindow.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Preparing book…</title></head><body style="font:16px system-ui;padding:32px;color:#333">Preparing your reading copy…</body></html>');
-  printWindow.document.close();
+  const nativePrint = typeof window.NovelHubAndroid?.printHtml === 'function';
+  const printWindow = nativePrint ? null : window.open('', '_blank');
+  if (!nativePrint && !printWindow) { toast('Allow pop-ups to prepare a PDF-ready copy'); return; }
+  if (printWindow) {
+    try { printWindow.opener = null; } catch (_) {}
+    printWindow.document.open();
+    printWindow.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Preparing book…</title></head><body style="font:16px system-ui;padding:32px;color:#333">Preparing your reading copy…</body></html>');
+    printWindow.document.close();
+  }
   const originalLabel = button?.textContent || 'SAVE AS PDF';
   const compactButton = button?.classList.contains('reader-pdf-tool');
   if (button) { button.disabled = true; button.textContent = compactButton ? 'PDF…' : 'PREPARING…'; button.setAttribute('aria-live', 'polite'); }
@@ -374,16 +377,22 @@ async function downloadBookPdf(book, button) {
         return { title: content.title && content.title !== 'Chapter' ? content.title : chapter.title, content: content.content };
       }));
       if (button && !compactButton) button.textContent = `PREPARING ${loaded.length}/${chapters.length}`;
-      if (printWindow.closed) throw new Error('The print window was closed before the book was ready.');
-      printWindow.document.body.textContent = `Preparing your reading copy… ${loaded.length} of ${chapters.length} chapters`;
+      if (printWindow?.closed) throw new Error('The print window was closed before the book was ready.');
+      if (printWindow) printWindow.document.body.textContent = `Preparing your reading copy… ${loaded.length} of ${chapters.length} chapters`;
     }
-    if (printWindow.closed) return;
-    printWindow.document.open();
-    printWindow.document.write(printDocument(book, loaded));
-    printWindow.document.close();
-    toast('Reading copy ready. Choose “Save as PDF” in the print dialog.');
+    if (printWindow?.closed) return;
+    const html = printDocument(book, loaded);
+    if (nativePrint) {
+      window.NovelHubAndroid.printHtml(html, book.title);
+      toast('Choose “Save as PDF” in the Android print sheet.');
+    } else {
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+      toast('Reading copy ready. Choose “Save as PDF” in the print dialog.');
+    }
   } catch (error) {
-    if (!printWindow.closed) printWindow.close();
+    if (printWindow && !printWindow.closed) printWindow.close();
     toast(error instanceof Error ? error.message : 'Could not prepare this book. Please try again.');
   } finally {
     if (button?.isConnected) { button.disabled = false; button.textContent = originalLabel; }

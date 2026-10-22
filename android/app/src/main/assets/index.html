@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07080d">
+  <meta name="description" content="Novel Hub — discover, read and save your next story.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Novel Hub">
+  <meta property="og:title" content="Novel Hub — Stories worth getting lost in.">
+  <meta property="og:description" content="Discover, read and save your next story on Novel Hub.">
+  <meta property="og:image" content="https://files.catbox.moe/ig4q4j.jpg">
+  <meta property="og:image:secure_url" content="https://files.catbox.moe/ig4q4j.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:alt" content="Novel Hub">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Novel Hub — Stories worth getting lost in.">
+  <meta name="twitter:description" content="Discover, read and save your next story on Novel Hub.">
+  <meta name="twitter:image" content="https://files.catbox.moe/ig4q4j.jpg">
+  <meta name="application-name" content="Novel Hub">
+  <title>Novel Hub</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/detail-inline.css">
+  <link rel="stylesheet" href="/library.css">
+  <link rel="stylesheet" href="/finishing-touches.css">
+  <link rel="stylesheet" href="/reader-polish.css">
+</head>
+<body>
+  <div class="bg-noise" aria-hidden="true"></div>
+  <a class="skip-link" href="#app">Skip to content</a>
+  <header class="topbar">
+    <a class="logo" href="/" aria-label="Novel Hub home"><span>🦊</span> NOVEL<span>HUB</span></a>
+    <nav aria-label="Main navigation"><a href="/">Home</a><a href="/genres">Genres</a><a href="/shelf">My Shelf</a></nav>
+    <button id="installBtn" class="install-btn" type="button" hidden>INSTALL APP</button>
+    <form id="navSearch" class="nav-search" role="search" aria-label="Search novels">
+      <span aria-hidden="true">⌕</span><input id="navSearchInput" type="search" placeholder="Search novels..." autocomplete="off" aria-label="Search novels"><button type="submit" aria-label="Submit search">→</button>
+    </form>
+    <button id="menuBtn" class="menu-btn" type="button" aria-label="Open menu" aria-expanded="false">☰</button>
+  </header>
+  <main id="app" tabindex="-1"></main>
+  <footer class="footer"><div><b>🦊 NOVELHUB</b><span>Stories worth getting lost in.</span></div><span>FOXY TECH</span></footer>
+  <div id="toast" class="toast" aria-live="polite"></div>
+  <script src="/api-recovery.js"></script>
+  <script src="/app.js" defer></script>
+  <script src="/library.js" defer></script>
+</body>
+</html>

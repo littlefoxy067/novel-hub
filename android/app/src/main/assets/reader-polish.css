@@ -1,0 +1,71 @@
+/* Reading controls, book-export CTA, and print-friendly interface refinements. */
+.novel-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+.novel-actions .continue-reading { margin-top: 0; }
+.pdf-action { min-height: 42px; cursor: pointer; }
+.pdf-action:disabled { opacity: .55; cursor: not-allowed; }
+.pdf-note { margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+
+.reader-topbar {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+}
+.reader-top-tools > button {
+  min-width: 40px;
+  min-height: 40px;
+  cursor: pointer;
+  transition: border-color .18s ease, background .18s ease, color .18s ease;
+}
+.reader-top-tools > button[aria-expanded="true"] {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 10%, transparent);
+  color: var(--cyan);
+}
+.reader-pdf-tool { letter-spacing: .08em; }
+.reader-main { padding-bottom: clamp(72px, 10vh, 120px); }
+.reader-article { text-wrap: pretty; }
+.reader-article p { margin-bottom: 1.45em; }
+.reader-article::selection, .reader-article *::selection {
+  background: color-mix(in srgb, var(--cyan) 32%, transparent);
+}
+.reader-shell[data-theme="sepia"] .reader-article::selection,
+.reader-shell[data-theme="sepia"] .reader-article *::selection {
+  background: #d6b98b;
+}
+.reader-settings[hidden], .reader-overlay[hidden] { display: none !important; }
+.reader-drawer { overscroll-behavior: contain; }
+.reader-chapter-list a { min-height: 48px; align-content: center; }
+.chapter-nav-btn, .chapter-nav-center { transition: border-color .18s ease, color .18s ease, transform .18s ease; }
+.chapter-nav-btn:hover { transform: translateY(-2px); }
+
+@media (max-width: 700px) {
+  .reader-top-tools > button { min-width: 40px; min-height: 40px; padding: 0 9px; }
+  .reader-top-tools { gap: 5px; }
+  .reader-main { width: 90%; }
+  .reader-article { text-wrap: initial; }
+  .reader-article p { margin-bottom: 1.3em; }
+  .reader-settings { max-height: calc(100dvh - 130px); overflow-y: auto; }
+  .novel-actions { gap: 8px; }
+  .novel-actions > * { flex: 1 1 145px; }
+  .pdf-note { max-width: 38em; }
+}
+
+@media (max-width: 420px) {
+  .reader-top-left { gap: 7px; }
+  .reader-book { padding-left: 8px; }
+  .reader-book small { max-width: 23vw; }
+  .reader-book b { max-width: 27vw; }
+  .reader-top-tools > button { min-width: 36px; padding: 0 6px; }
+}
+
+@media print {
+  .reader-topbar, .reader-progress, .reader-settings, .reader-drawer,
+  .reader-overlay, .reader-top, .chapter-nav { display: none !important; }
+  .reader-shell, .reader-main { width: 100%; max-width: none; background: #fff; color: #111; }
+  .reader-article { max-width: none; color: #111; font-size: 12pt; line-height: 1.65; }
+  .reader-article h1 { color: #111; }
+}
