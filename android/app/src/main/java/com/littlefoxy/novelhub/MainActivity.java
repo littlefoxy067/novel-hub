@@ -213,13 +213,13 @@ public final class MainActivity extends Activity {
                                 .build();
                         manager.print(title, adapter, attributes);
                     } catch (RuntimeException exception) {
-                        showPrintError("Could not open Android printing. Please try again.");
+                        showPrintError("Could not open Android printing. Select Save as PDF and retry.");
                     }
                 }
             });
             printWebView.loadDataWithBaseURL(APP_ORIGIN + "/", html, "text/html", "UTF-8", null);
         } catch (RuntimeException exception) {
-            showPrintError("Could not open Android printing. Please try again.");
+            showPrintError("Could not open Android printing. Select Save as PDF and retry.");
         }
     }
 }

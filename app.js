@@ -68,10 +68,40 @@ function normalizeChapters(payload) {
   })).filter(chapter => chapter.id);
 }
 
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function apiRetryDelay(response, attempt) {
+  const header = response?.headers?.get('Retry-After');
+  const seconds = Number(header);
+  const retryAt = Number.isFinite(seconds) && header ? seconds * 1000 : Date.parse(header || '');
+  const requested = Number.isFinite(retryAt) ? (retryAt > 1e12 ? retryAt - Date.now() : retryAt) : NaN;
+  return Math.min(60000, Math.max(750, Number.isFinite(requested) ? requested : 750 * (2 ** attempt)));
+}
+
 async function api(path) {
-  const response = await fetch(/^https?:\/\//i.test(path) ? path : API + path, { headers: { Accept: 'application/json' }, cache: 'no-store' });
-  if (!response.ok) throw new Error(`API ${response.status}`);
-  return response.json();
+  const url = /^https?:\/\//i.test(path) ? path : API + path;
+  const retryable = new Set([429, 502, 503, 504]);
+  let lastError;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    let response;
+    try {
+      response = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+    } catch (error) {
+      lastError = error;
+      if (attempt === 3) throw new Error('Could not reach the Novel API. Check your connection and try again.');
+      await wait(apiRetryDelay(null, attempt));
+      continue;
+    }
+    if (response.ok) return response.json();
+    if (!retryable.has(response.status)) throw new Error(`API ${response.status}`);
+    if (attempt === 3) {
+      if (response.status === 429) throw new Error('The Novel API is temporarily rate-limiting requests (429). Wait a minute and retry.');
+      throw new Error(`The Novel API is temporarily unavailable (${response.status}). Please try again.`);
+    }
+    lastError = new Error(`API ${response.status}`);
+    await wait(apiRetryDelay(response, attempt));
+  }
+  throw lastError || new Error('Could not load this chapter. Please try again.');
 }
 
 function shelfLoad() {
@@ -305,7 +335,7 @@ function renderNovel(book, chapters) {
   const progress = progressLoad();
   const first = chapters[0];
   const continueChapter = chapters.find(ch => Number(progress[ch.id]) > 0) || first;
-  app.innerHTML = `<div class="page detail"><a class="back" href="/">← HOME</a><div class="detail-top"><div>${poster(book)}</div><div><div class="eyebrow">NOVEL</div><h1>${esc(book.title)}</h1><p class="author">${esc(book.author)}</p><p class="summary">${esc(book.summary)}</p><div class="novel-actions"><button type="button" class="primary" id="saveBook">${isSaved(book) ? '✓ SAVED' : '+ ADD TO SHELF'}</button>${continueChapter ? `<a class="continue-reading" href="${chapterHref(continueChapter, book, continueChapter.index)}">${continueChapter === first ? 'START READING' : 'CONTINUE READING'} <span>→</span></a>` : ''}<button type="button" class="secondary pdf-action" id="downloadBookPdf" ${chapters.length ? '' : 'disabled'}>SAVE AS PDF</button></div><p class="pdf-note">Opens a clean, print-ready copy. Choose “Save as PDF” in your browser’s print dialog.</p></div></div><div class="chapters"><div class="chapters-heading"><div><div class="eyebrow">READ</div><h2>Chapters</h2></div><span>${chapters.length ? chapters.length + ' chapters' : 'No chapters'}</span></div><div id="chapterList">${chapters.length ? chapters.map((chapter, index) => `<a class="chapter" href="${chapterHref(chapter, book, index)}"><span>${esc(chapter.title)}</span><span>${Number(progress[chapter.id]) > 0 ? '↗' : '→'}</span></a>`).join('') : '<div class="status">No chapters found.</div>'}</div></div></div>`;
+  app.innerHTML = `<div class="page detail"><a class="back" href="/">← HOME</a><div class="detail-top"><div>${poster(book)}</div><div><div class="eyebrow">NOVEL</div><h1>${esc(book.title)}</h1><p class="author">${esc(book.author)}</p><p class="summary">${esc(book.summary)}</p><div class="novel-actions"><button type="button" class="primary" id="saveBook">${isSaved(book) ? '✓ SAVED' : '+ ADD TO SHELF'}</button>${continueChapter ? `<a class="continue-reading" href="${chapterHref(continueChapter, book, continueChapter.index)}">${continueChapter === first ? 'START READING' : 'CONTINUE READING'} <span>→</span></a>` : ''}<button type="button" class="secondary pdf-action" id="downloadBookPdf" ${chapters.length ? '' : 'disabled'}>SAVE AS PDF</button></div><p class="pdf-note">${/NovelHubAndroidApp\//.test(navigator.userAgent) ? "Android opens its print sheet: choose Save as PDF, then Downloads." : "Opens a print-ready copy; choose Save as PDF in your browser’s print dialog."}</p></div></div><div class="chapters"><div class="chapters-heading"><div><div class="eyebrow">READ</div><h2>Chapters</h2></div><span>${chapters.length ? chapters.length + ' chapters' : 'No chapters'}</span></div><div id="chapterList">${chapters.length ? chapters.map((chapter, index) => `<a class="chapter" href="${chapterHref(chapter, book, index)}"><span>${esc(chapter.title)}</span><span>${Number(progress[chapter.id]) > 0 ? '↗' : '→'}</span></a>`).join('') : '<div class="status">No chapters found.</div>'}</div></div></div>`;
   inlineSummaryMore();
   $('#saveBook')?.addEventListener('click', () => { toggleShelf(book); const button = $('#saveBook'); if (button) button.textContent = isSaved(book) ? '✓ SAVED' : '+ ADD TO SHELF'; });
   $('#downloadBookPdf')?.addEventListener('click', event => downloadBookPdf(book, event.currentTarget));
@@ -327,7 +357,9 @@ async function getChapterContent(id) {
   const contentPath = pick(raw, ['contentPath', 'content_path', 'contentUrl', 'content_url'], '');
   const candidate = contentPath || (typeof content === 'string' ? content : '');
   if (candidate && typeof candidate === 'string' && (/^https?:\/\//i.test(candidate) || /^\/?content\//i.test(candidate))) {
-    try { const loaded = unwrap(await api(candidate)); content = pick(loaded, ['content', 'text', 'body', 'value'], loaded); } catch (_) {}
+    try { const loaded = unwrap(await api(candidate)); content = pick(loaded, ['content', 'text', 'body', 'value'], loaded); } catch (error) {
+      if (error instanceof Error && /rate-limit|temporarily unavailable/i.test(error.message)) throw error;
+    }
   }
   if (content && typeof content === 'object') content = pick(content, ['content', 'text', 'body', 'value'], '');
   return { title: String(pick(raw, ['title', 'name', 'chapterName'], 'Chapter')), content: String(content || 'No chapter content available.') };
@@ -370,18 +402,17 @@ async function downloadBookPdf(book, button) {
     if (!chapters.length) throw new Error('No chapters are available for this novel.');
     if (chapters.length >= 5000) throw new Error('This novel exceeds the export limit of 5,000 chapters.');
     const loaded = [];
-    for (let offset = 0; offset < chapters.length; offset += 4) {
-      const batch = chapters.slice(offset, offset + 4);
-      const results = await Promise.all(batch.map(async chapter => ({ chapter, content: await getChapterContent(chapter.id) })));
-      loaded.push(...results.map(({ chapter, content }) => {
-        if (!content.content || content.content === 'No chapter content available.' || /^https?:\/\/|^\/?content\//i.test(content.content)) {
-          throw new Error(`Could not retrieve “${chapter.title}”. No PDF was created.`);
-        }
-        return { title: content.title && content.title !== 'Chapter' ? content.title : chapter.title, content: content.content };
-      }));
+    for (let index = 0; index < chapters.length; index++) {
+      const chapter = chapters[index];
+      const content = await getChapterContent(chapter.id);
+      if (!content.content || content.content === 'No chapter content available.' || /^https?:\/\/|^\/?content\//i.test(content.content)) {
+        throw new Error(`Could not retrieve “${chapter.title}”. No PDF was created.`);
+      }
+      loaded.push({ title: content.title && content.title !== 'Chapter' ? content.title : chapter.title, content: content.content });
       if (button && !compactButton) button.textContent = `PREPARING ${loaded.length}/${chapters.length}`;
       if (printWindow?.closed) throw new Error('The print window was closed before the book was ready.');
       if (printWindow) printWindow.document.body.textContent = `Preparing your reading copy… ${loaded.length} of ${chapters.length} chapters`;
+      if (index + 1 < chapters.length) await wait(400);
     }
     if (printWindow?.closed) return;
     const html = printDocument(book, loaded);
@@ -391,7 +422,7 @@ async function downloadBookPdf(book, button) {
       } else {
         nativeBridge.printHtml(html, book.title);
       }
-      toast('Choose “Save as PDF” in the Android print sheet.');
+      toast('Android print sheet: choose “Save as PDF”, then select Downloads.');
     } else {
       printWindow.document.open();
       printWindow.document.write(html);
@@ -400,7 +431,8 @@ async function downloadBookPdf(book, button) {
     }
   } catch (error) {
     if (printWindow && !printWindow.closed) printWindow.close();
-    toast(error instanceof Error ? error.message : 'Could not prepare this book. Please try again.');
+    const message = error instanceof Error ? error.message : 'Could not prepare this book. Please try again.';
+    toast(/rate-limit|temporarily unavailable/i.test(message) ? `${message} No PDF was saved.` : message);
   } finally {
     if (button?.isConnected) { button.disabled = false; button.textContent = originalLabel; }
   }

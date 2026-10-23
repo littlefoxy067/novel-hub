@@ -16,4 +16,8 @@ cd android
 
 The directly installable APK is written to `app/build/outputs/apk/release/app-release.apk`. It is signed with the Android debug key for direct testing/installation, not for Google Play distribution. A production Play Store release needs a private production signing key.
 
-The PDF action opens Android's native print sheet. Select **Save as PDF**, then select the destination in Android's file picker. The app waits for the print WebView to finish loading and invokes Android's native print API.
+## Save a book as PDF
+
+On Android, the PDF action uses the platform print screen. It may initially look like a printer selector, but **Save as PDF** is one of the available destinations. Tap **Save as PDF**, then select **Downloads** and confirm the filename. The website/browser flow opens the print-ready page; choose **Save as PDF** in the browser's print dialog there as well.
+
+PDF preparation fetches the book's chapters from the Novel API. The app retries temporary API rate limits, fetches chapters one at a time to avoid request bursts, and reports a clear message if the API remains unavailable; it does not save an incomplete book.
